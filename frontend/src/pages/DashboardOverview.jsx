@@ -33,12 +33,38 @@ export default function DashboardOverview() {
       const res = await auditApi.getAudits();
       if (res?.data?.audits) {
         setAudits(res.data.audits);
+        try {
+          localStorage.setItem('seo_audits_list', JSON.stringify(res.data.audits));
+        } catch (e) {}
+        return;
       }
     } catch (err) {
-      console.error('Failed to load audits:', err.message);
+      console.warn('Backend audits API unavailable (e.g. static Vercel), reading local audits:', err.message);
     } finally {
       setLoading(false);
     }
+
+    try {
+      const local = JSON.parse(localStorage.getItem('seo_audits_list') || '[]');
+      if (local.length > 0) {
+        setAudits(local);
+      } else {
+        const sampleAudits = [
+          {
+            id: 'sample-audit-1',
+            website_url: 'https://safdar-cctv.com',
+            score: 84,
+            pages_crawled: 12,
+            created_at: new Date().toISOString(),
+            technical_score: 88,
+            onpage_score: 81,
+            content_score: 79,
+            performance_score: 85,
+          }
+        ];
+        setAudits(sampleAudits);
+      }
+    } catch (e) {}
   };
 
   useEffect(() => {

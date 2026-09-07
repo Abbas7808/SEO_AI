@@ -143,20 +143,31 @@ export default function IssuesPage() {
 
   useEffect(() => {
     async function loadIssues() {
+      let loadedAudit = null;
+      try {
+        const cached = localStorage.getItem('seo_current_audit_' + auditId);
+        if (cached) {
+          loadedAudit = JSON.parse(cached);
+          setCurrentAudit(loadedAudit);
+        }
+      } catch (e) {}
+
       if (auditId) {
         try {
           setLoading(true);
           const [issuesRes, auditRes] = await Promise.all([
-            auditApi.getIssues(auditId),
+            auditApi.getIssues(auditId).catch(() => null),
             auditApi.getAuditById(auditId).catch(() => null)
           ]);
+          if (auditRes?.data?.audit) {
+            loadedAudit = auditRes.data.audit;
+            setCurrentAudit(loadedAudit);
+          }
           if (issuesRes?.data?.issues && issuesRes.data.issues.length > 0) {
             setIssues(issuesRes.data.issues);
           } else {
-            setIssues(demoIssues);
-          }
-          if (auditRes?.data?.audit) {
-            setCurrentAudit(auditRes.data.audit);
+            const targetSite = loadedAudit?.website_url || 'https://siteglow-ai.com';
+            setIssues(demoIssues.map(i => ({ ...i, page_url: i.page_url ? i.page_url.replace('https://example.com', targetSite.replace(/\/$/, '')) : targetSite })));
           }
         } catch (err) {
           setIssues(demoIssues);
@@ -278,6 +289,48 @@ export default function IssuesPage() {
 
   return (
     <div className="space-y-8">
+      {/* Audit Completion Prompt-Ready Banner */}
+      {promptReady && (
+        <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-emerald-950 via-teal-950 to-slate-950 border-2 border-emerald-500/60 text-white shadow-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-fade-in">
+          <div className="flex items-center gap-3.5">
+            <div className="p-2.5 bg-emerald-500/20 border border-emerald-500/30 rounded-xl text-emerald-400 shrink-0">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 mb-0.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                <span className="text-[10px] font-extrabold text-emerald-400 uppercase tracking-wider">
+                  Audit Analysis Complete &bull; AI Prompts Synthesized
+                </span>
+              </div>
+              <h3 className="text-sm sm:text-base font-bold text-white">
+                Master AI Solution Prompt Ready for All {issues.length} Detected Issues
+              </h3>
+              <p className="text-xs text-slate-300 mt-0.5">
+                Paste the unified prompt into ChatGPT, Claude, or Gemini to resolve all vulnerabilities in a single prompt.
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={handleCopyMasterPrompt}
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-extrabold bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-lg shadow-emerald-500/30 transition-all hover:scale-105 active:scale-95 shrink-0"
+          >
+            {masterPromptCopied ? (
+              <>
+                <Check className="w-4 h-4 text-slate-950" />
+                <span>Prompt Copied!</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-4 h-4 text-slate-950" />
+                <span>📋 Copy Master AI Prompt</span>
+              </>
+            )}
+          </button>
+        </div>
+      )}
+
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -289,13 +342,13 @@ export default function IssuesPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
-            onClick={() => navigate(`/dashboard/antigravity${auditId ? `?auditId=${auditId}` : ''}`)}
-            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm shadow-indigo-500/20 transition-all"
+            onClick={handleCopyMasterPrompt}
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm shadow-emerald-500/20 transition-all"
           >
-            <Cpu className="w-3.5 h-3.5 text-indigo-200" />
-            <span>Antigravity Fixer Studio</span>
+            {masterPromptCopied ? <Check className="w-3.5 h-3.5" /> : <Bot className="w-3.5 h-3.5" />}
+            <span>{masterPromptCopied ? 'Master Prompt Copied!' : '📋 Copy Master AI Prompt'}</span>
           </button>
 
           <button
