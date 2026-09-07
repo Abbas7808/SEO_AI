@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles, Shield, Cpu, Code2, Heart } from 'lucide-react';
+import { Sparkles, Shield, Cpu, Code2, Heart, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export default function Footer() {
@@ -10,15 +10,15 @@ export default function Footer() {
           {/* Brand Col */}
           <div className="md:col-span-1 space-y-4">
             <Link to="/" className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-brand-600 text-white flex items-center justify-center">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-brand-600 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-brand-500/20">
                 <Sparkles className="w-4 h-4" />
               </div>
-              <span className="font-bold text-lg tracking-tight text-slate-900 dark:text-white">
-                AI SEO <span className="text-brand-600 dark:text-brand-400">Auditor</span>
+              <span className="font-extrabold text-lg tracking-tight text-slate-900 dark:text-white">
+                siteglow<span className="text-brand-600 dark:text-brand-400">-ai</span>
               </span>
             </Link>
             <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
-              Production-ready SEO audit & optimization platform powered by real website crawling, technical analysis, and intelligent AI recommendations.
+              Autonomous SEO audit & optimization platform powered by real website crawling, technical analysis, and intelligent Master AI solution prompts.
             </p>
           </div>
 
@@ -44,7 +44,7 @@ export default function Footer() {
             <ul className="space-y-2.5 text-sm text-slate-600 dark:text-slate-400">
               <li><Link to="/dashboard/optimizer" className="hover:text-brand-600 dark:hover:text-brand-400">Content Optimizer</Link></li>
               <li><Link to="/dashboard/consultant" className="hover:text-brand-600 dark:hover:text-brand-400">AI SEO Consultant</Link></li>
-              <li><Link to="/dashboard/issues" className="hover:text-brand-600 dark:hover:text-brand-400">Fix Code Generator</Link></li>
+              <li><Link to="/dashboard/issues" className="hover:text-brand-600 dark:hover:text-brand-400">Master AI Prompt Studio</Link></li>
               <li><Link to="/dashboard/reports" className="hover:text-brand-600 dark:hover:text-brand-400">PDF Report Generator</Link></li>
             </ul>
           </div>
@@ -64,7 +64,22 @@ export default function Footer() {
         </div>
 
         <div className="pt-8 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 dark:text-slate-400 gap-4">
-          <p>© {new Date().getFullYear()} AI Website SEO Auditor. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} siteglow-ai. All rights reserved.</p>
+
+          {/* Developer Attribution with LinkedIn Link */}
+          <div className="flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-300">
+            <span>Developed By</span>
+            <a
+              href="https://www.linkedin.com/in/munim-abbas"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 font-extrabold hover:underline transition-all bg-brand-50 dark:bg-brand-950/60 px-2.5 py-1 rounded-md border border-brand-200 dark:border-brand-900"
+            >
+              <span>Munim Abbas</span>
+              <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
+
           <div className="flex items-center gap-6">
             <span className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>

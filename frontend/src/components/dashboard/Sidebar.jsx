@@ -51,15 +51,15 @@ export default function Sidebar({ mobileOpen, setMobileOpen }) {
       {/* Brand Header */}
       <div className="flex items-center justify-between h-16 px-6 border-b border-slate-200 dark:border-slate-800">
         <NavLink to="/" className="flex items-center gap-2.5 group">
-          <div className="w-9 h-9 rounded-xl bg-brand-600 text-white flex items-center justify-center shadow-md shadow-brand-500/20 group-hover:scale-105 transition-transform">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-brand-500/20 group-hover:scale-105 transition-transform">
             <Sparkles className="w-5 h-5" />
           </div>
           <div className="flex flex-col">
-            <span className="font-bold text-base leading-tight tracking-tight text-slate-900 dark:text-white">
-              AI SEO <span className="text-brand-600 dark:text-brand-400">Auditor</span>
+            <span className="font-extrabold text-base leading-tight tracking-tight text-slate-900 dark:text-white">
+              siteglow<span className="text-brand-600 dark:text-brand-400">-ai</span>
             </span>
             <span className="text-[9px] uppercase font-bold tracking-wider text-slate-400">
-              SaaS Engine
+              SEO Engine
             </span>
           </div>
         </NavLink>

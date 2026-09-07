@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { Sparkles, ArrowRight, Lock, Mail, AlertCircle } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
 export default function LoginPage() {
+  const [searchParams] = useSearchParams();
+  const redirectUrl = searchParams.get('redirect');
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -12,7 +15,7 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const from = location.state?.from?.pathname || '/dashboard';
+  const from = redirectUrl ? `/dashboard/new?url=${encodeURIComponent(redirectUrl)}` : (location.state?.from?.pathname || '/dashboard');
 
   const handleSubmit = async (e) => {
     e.preventDefault();

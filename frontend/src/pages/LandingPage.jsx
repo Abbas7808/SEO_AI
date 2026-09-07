@@ -30,7 +30,12 @@ export default function LandingPage() {
       return;
     }
     setError('');
-    navigate(`/dashboard/new?url=${encodeURIComponent(urlInput.trim())}`);
+    const hasToken = !!localStorage.getItem('seo_token');
+    if (!hasToken) {
+      navigate(`/register?redirect=${encodeURIComponent(urlInput.trim())}`);
+    } else {
+      navigate(`/dashboard/new?url=${encodeURIComponent(urlInput.trim())}`);
+    }
   };
 
   const features = [
@@ -282,92 +287,45 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Pricing Section */}
-      <section id="pricing" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center max-w-2xl mx-auto mb-16">
-          <h2 className="text-xs font-bold uppercase tracking-widest text-brand-600 dark:text-brand-400 mb-2">
-            Simple Pricing
-          </h2>
-          <h3 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-            Transparent Plans for Growing Brands
-          </h3>
-        </div>
+      {/* CTA Section (No Pricing) */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="relative rounded-3xl bg-gradient-to-br from-brand-900 via-indigo-950 to-slate-950 p-8 sm:p-14 text-center text-white overflow-hidden shadow-2xl border border-indigo-500/30">
+          <div className="absolute top-0 right-0 -mt-10 -mr-10 w-80 h-80 bg-brand-500/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute bottom-0 left-0 -mb-10 -ml-10 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-          {/* Starter Plan */}
-          <div className="p-8 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
-            <div>
-              <h4 className="text-lg font-bold text-slate-900 dark:text-white">Free Auditor</h4>
-              <p className="text-xs text-slate-500 mt-1">Perfect for single websites & hobbyists</p>
-              <div className="mt-6 mb-6">
-                <span className="text-4xl font-extrabold text-slate-900 dark:text-white">$0</span>
-                <span className="text-xs text-slate-500"> / forever</span>
-              </div>
-              <ul className="space-y-3 text-xs text-slate-600 dark:text-slate-400">
-                <li className="flex items-center gap-2"><Check className="w-4 h-4 text-emerald-500" /> Up to 20 crawled pages</li>
-                <li className="flex items-center gap-2"><Check className="w-4 h-4 text-emerald-500" /> Full technical & on-page checks</li>
-                <li className="flex items-center gap-2"><Check className="w-4 h-4 text-emerald-500" /> 0–100 Weighted score engine</li>
-                <li className="flex items-center gap-2"><Check className="w-4 h-4 text-emerald-500" /> AI Executive summary</li>
-              </ul>
+          <div className="relative z-10 max-w-3xl mx-auto space-y-6">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 text-brand-300 text-xs font-bold uppercase tracking-wider backdrop-blur-sm border border-white/10">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Full Access Unlocked &bull; 100% Free to Use</span>
             </div>
-            <button
-              onClick={() => navigate('/dashboard/new')}
-              className="mt-8 w-full py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 font-semibold text-xs hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-            >
-              Start Free Audit
-            </button>
-          </div>
 
-          {/* Pro Plan */}
-          <div className="relative p-8 rounded-2xl bg-white dark:bg-slate-900 border-2 border-brand-600 shadow-xl flex flex-col justify-between">
-            <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-brand-600 text-white text-[10px] font-extrabold uppercase tracking-wider">
-              Most Popular
-            </div>
-            <div>
-              <h4 className="text-lg font-bold text-slate-900 dark:text-white">Pro Consultant</h4>
-              <p className="text-xs text-slate-500 mt-1">For web agencies & growth consultants</p>
-              <div className="mt-6 mb-6">
-                <span className="text-4xl font-extrabold text-slate-900 dark:text-white">$49</span>
-                <span className="text-xs text-slate-500"> / month</span>
-              </div>
-              <ul className="space-y-3 text-xs text-slate-600 dark:text-slate-400">
-                <li className="flex items-center gap-2"><Check className="w-4 h-4 text-emerald-500" /> Up to 100 crawled pages per audit</li>
-                <li className="flex items-center gap-2"><Check className="w-4 h-4 text-emerald-500" /> Downloadable White-Label PDF reports</li>
-                <li className="flex items-center gap-2"><Check className="w-4 h-4 text-emerald-500" /> Interactive AI Consultant Chatbot</li>
-                <li className="flex items-center gap-2"><Check className="w-4 h-4 text-emerald-500" /> Auto-Generated HTML/Schema code fixes</li>
-                <li className="flex items-center gap-2"><Check className="w-4 h-4 text-emerald-500" /> Historical audit comparisons</li>
-              </ul>
-            </div>
-            <button
-              onClick={() => navigate('/register')}
-              className="mt-8 w-full py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs shadow-md shadow-brand-500/20 transition-all"
-            >
-              Get Started with Pro
-            </button>
-          </div>
+            <h2 className="text-3xl sm:text-5xl font-extrabold tracking-tight">
+              Ready to Glow Your Rankings with <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-400 to-cyan-300">siteglow-ai</span>?
+            </h2>
 
-          {/* Agency Plan */}
-          <div className="p-8 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
-            <div>
-              <h4 className="text-lg font-bold text-slate-900 dark:text-white">Enterprise Agency</h4>
-              <p className="text-xs text-slate-500 mt-1">High-volume audits & client pipelines</p>
-              <div className="mt-6 mb-6">
-                <span className="text-4xl font-extrabold text-slate-900 dark:text-white">$149</span>
-                <span className="text-xs text-slate-500"> / month</span>
-              </div>
-              <ul className="space-y-3 text-xs text-slate-600 dark:text-slate-400">
-                <li className="flex items-center gap-2"><Check className="w-4 h-4 text-emerald-500" /> Unlimited monthly audits</li>
-                <li className="flex items-center gap-2"><Check className="w-4 h-4 text-emerald-500" /> Priority multi-threaded crawler queue</li>
-                <li className="flex items-center gap-2"><Check className="w-4 h-4 text-emerald-500" /> Custom branding on PDF exports</li>
-                <li className="flex items-center gap-2"><Check className="w-4 h-4 text-emerald-500" /> REST API programmatic access</li>
-              </ul>
+            <p className="text-sm sm:text-base text-slate-300 max-w-xl mx-auto leading-relaxed">
+              Detect every hidden SEO vulnerability, generate master AI repair prompts, and boost organic traffic with precision.
+            </p>
+
+            <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3.5">
+              <button
+                onClick={() => {
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="w-full sm:w-auto px-8 py-3.5 rounded-xl font-extrabold text-sm text-slate-950 bg-white hover:bg-slate-100 shadow-lg shadow-white/10 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2"
+              >
+                <Search className="w-4 h-4 text-brand-600" />
+                <span>Audit Your Website Now</span>
+              </button>
+
+              <button
+                onClick={() => navigate('/register')}
+                className="w-full sm:w-auto px-8 py-3.5 rounded-xl font-bold text-sm text-white bg-indigo-600/80 hover:bg-indigo-600 border border-indigo-400/40 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2"
+              >
+                <span>Create Free Account</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
             </div>
-            <button
-              onClick={() => navigate('/register')}
-              className="mt-8 w-full py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 font-semibold text-xs hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-            >
-              Contact Sales
-            </button>
           </div>
         </div>
       </section>

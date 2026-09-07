@@ -20,21 +20,36 @@ import {
   X,
   ArrowRight,
   ShieldCheck,
-  RefreshCw
+  RefreshCw,
+  Bot,
+  FileText,
+  Download,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { auditApi, antigravityApi } from '../services/api';
 import { getSeverityBadge } from '../utils/formatters';
+import { generateSingleIssuePrompt, generateMasterAllIssuesPrompt } from '../utils/promptGenerator';
 
 export default function IssuesPage() {
   const [searchParams] = useSearchParams();
   const auditId = searchParams.get('auditId');
+  const promptReady = searchParams.get('promptReady') === 'true';
 
   const [issues, setIssues] = useState([]);
+  const [currentAudit, setCurrentAudit] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [copiedId, setCopiedId] = useState(null);
   const [expandedIssue, setExpandedIssue] = useState(null);
+
+  // High-Professional AI Prompt Studio states
+  const [promptFramework, setPromptFramework] = useState('react');
+  const [masterPromptExpanded, setMasterPromptExpanded] = useState(true);
+  const [masterPromptCopied, setMasterPromptCopied] = useState(false);
+  const [copiedPromptIssueId, setCopiedPromptIssueId] = useState(null);
+  const [expandedPromptIssueId, setExpandedPromptIssueId] = useState(null);
 
   // Antigravity Auto-Fixer Modal state
   const [antigravityModalIssue, setAntigravityModalIssue] = useState(null);
@@ -131,11 +146,17 @@ export default function IssuesPage() {
       if (auditId) {
         try {
           setLoading(true);
-          const res = await auditApi.getIssues(auditId);
-          if (res?.data?.issues && res.data.issues.length > 0) {
-            setIssues(res.data.issues);
+          const [issuesRes, auditRes] = await Promise.all([
+            auditApi.getIssues(auditId),
+            auditApi.getAuditById(auditId).catch(() => null)
+          ]);
+          if (issuesRes?.data?.issues && issuesRes.data.issues.length > 0) {
+            setIssues(issuesRes.data.issues);
           } else {
             setIssues(demoIssues);
+          }
+          if (auditRes?.data?.audit) {
+            setCurrentAudit(auditRes.data.audit);
           }
         } catch (err) {
           setIssues(demoIssues);
@@ -154,6 +175,45 @@ export default function IssuesPage() {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleCopyMasterPrompt = () => {
+    const text = generateMasterAllIssuesPrompt({
+      audit: currentAudit,
+      issues,
+      framework: promptFramework,
+      websiteUrl: currentAudit?.website_url || (issues[0]?.page_url) || 'https://example.com'
+    });
+    navigator.clipboard.writeText(text);
+    setMasterPromptCopied(true);
+    setTimeout(() => setMasterPromptCopied(false), 2500);
+  };
+
+  const handleCopySinglePrompt = (issue) => {
+    const text = generateSingleIssuePrompt({
+      issue,
+      websiteUrl: issue.page_url || currentAudit?.website_url || 'https://example.com',
+      framework: promptFramework
+    });
+    navigator.clipboard.writeText(text);
+    setCopiedPromptIssueId(issue.id);
+    setTimeout(() => setCopiedPromptIssueId(null), 2500);
+  };
+
+  const handleDownloadMasterPrompt = () => {
+    const text = generateMasterAllIssuesPrompt({
+      audit: currentAudit,
+      issues,
+      framework: promptFramework,
+      websiteUrl: currentAudit?.website_url || (issues[0]?.page_url) || 'https://example.com'
+    });
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `master-seo-ai-fix-prompt-${promptFramework}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleOpenAntigravity = async (issue, framework = modalFramework) => {
@@ -256,37 +316,148 @@ export default function IssuesPage() {
         </div>
       </div>
 
-      {/* Google Antigravity Banner */}
-      <div className="bg-gradient-to-r from-gray-950 via-indigo-950 to-purple-950 rounded-2xl p-5 sm:p-6 text-white border border-indigo-500/40 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div className="flex items-start gap-4">
-          <div className="p-3 bg-indigo-600/30 border border-indigo-400/40 rounded-xl shrink-0 text-indigo-400">
-            <Cpu className="w-7 h-7 animate-pulse" />
+      {/* High-Professional Master AI Solution Prompt Studio */}
+      <div className="bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 rounded-2xl p-5 sm:p-6 text-white border border-indigo-500/40 shadow-2xl relative overflow-hidden">
+        {/* Glow backdrop decorative */}
+        <div className="absolute top-0 right-0 -mt-8 -mr-8 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-1/3 -mb-8 w-48 h-48 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
+
+        <div className="relative z-10 flex flex-col gap-5">
+          {/* Header Row */}
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="flex items-start gap-3.5">
+              <div className="p-3 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl shrink-0 shadow-lg shadow-indigo-500/30 text-white">
+                <Bot className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+                    Master AI Solution Prompt
+                  </span>
+                  <span className="text-[11px] font-medium text-slate-400">
+                    Solves All {issues.length} Detected Issues in One Shot
+                  </span>
+                </div>
+                <h2 className="text-lg sm:text-xl font-extrabold text-white tracking-tight">
+                  High-Professional AI Prompt Studio
+                </h2>
+                <p className="text-xs text-slate-300 max-w-2xl mt-1 leading-relaxed">
+                  Engineered prompt compiling all audit vulnerabilities. Paste this directly into <span className="text-indigo-300 font-semibold">ChatGPT-4o</span>, <span className="text-purple-300 font-semibold">Claude 3.5 Sonnet</span>, <span className="text-sky-300 font-semibold">Gemini 1.5 Pro</span>, or <span className="text-amber-300 font-semibold">Google Antigravity</span> to generate 100% production-ready, zero-placeholder code fixes.
+                </p>
+              </div>
+            </div>
+
+            {/* Top Action Buttons */}
+            <div className="flex items-center gap-2.5 flex-wrap shrink-0">
+              <button
+                onClick={handleCopyMasterPrompt}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-lg shadow-emerald-500/25 transition-all hover:scale-[1.02] active:scale-[0.98]"
+              >
+                {masterPromptCopied ? (
+                  <>
+                    <Check className="w-4 h-4 text-white" />
+                    <span>Copied to Clipboard!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4 text-emerald-100" />
+                    <span>📋 Copy Master AI Prompt</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={handleDownloadMasterPrompt}
+                title="Download prompt as text file"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-bold bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-200 transition-colors"
+              >
+                <Download className="w-3.5 h-3.5 text-slate-300" />
+                <span>.txt</span>
+              </button>
+
+              <button
+                onClick={() => setMasterPromptExpanded(!masterPromptExpanded)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-bold bg-indigo-950/60 hover:bg-indigo-900/80 border border-indigo-500/30 text-indigo-200 transition-colors"
+              >
+                {masterPromptExpanded ? (
+                  <>
+                    <EyeOff className="w-3.5 h-3.5" />
+                    <span>Hide</span>
+                  </>
+                ) : (
+                  <>
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>Preview Prompt</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-              <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-widest">
-                Google Antigravity Connected &bull; DeepMind Engine
+
+          {/* Framework Switcher Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-800/80">
+            <div className="flex items-center gap-2">
+              <Code2 className="w-4 h-4 text-indigo-400" />
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                Select Your Tech Stack:
               </span>
             </div>
-            <h2 className="text-base sm:text-lg font-extrabold text-white">
-              Autonomous SEO Repair Engine Ready
-            </h2>
-            <p className="text-xs text-gray-300 max-w-xl mt-0.5">
-              Click &quot;Fix with Google Antigravity&quot; on any issue below to synthesize validated code patches and see instant before-vs-after diffs.
-            </p>
-          </div>
-        </div>
 
-        <div className="flex items-center gap-3 shrink-0">
-          <button
-            onClick={() => navigate(`/dashboard/antigravity${auditId ? `?auditId=${auditId}` : ''}`)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-600/30 transition-all hover:scale-105 active:scale-95"
-          >
-            <Zap className="w-4 h-4 text-amber-300" />
-            <span>Open Antigravity Studio</span>
-            <ArrowRight className="w-4 h-4" />
-          </button>
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                { id: 'react', label: 'Next.js / React' },
+                { id: 'html', label: 'HTML5 / CSS / Vanilla JS' },
+                { id: 'wordpress', label: 'WordPress (PHP)' },
+                { id: 'shopify', label: 'Shopify (Liquid)' },
+                { id: 'vue', label: 'Vue.js / Nuxt' },
+              ].map((fw) => (
+                <button
+                  key={fw.id}
+                  onClick={() => setPromptFramework(fw.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    promptFramework === fw.id
+                      ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 border border-indigo-400/30'
+                      : 'bg-slate-800/60 text-slate-300 hover:bg-slate-800 hover:text-white border border-slate-700/50'
+                  }`}
+                >
+                  {fw.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Expanded Prompt Preview Window */}
+          {masterPromptExpanded && (
+            <div className="space-y-2 mt-1">
+              <div className="flex items-center justify-between text-[11px] text-slate-400 px-1">
+                <span className="font-mono flex items-center gap-1.5">
+                  <Terminal className="w-3 h-3 text-emerald-400" />
+                  Auto-formatted for LLM Reasoning Engines &bull; Target: <span className="text-white font-bold">{promptFramework.toUpperCase()}</span>
+                </span>
+                <span>Click &quot;Copy Master AI Prompt&quot; to transfer into any LLM</span>
+              </div>
+              <div className="relative">
+                <pre className="p-4 rounded-xl bg-slate-950/90 border border-slate-800 text-slate-300 text-xs font-mono max-h-72 overflow-y-auto leading-relaxed selection:bg-indigo-600 selection:text-white">
+                  <code>
+                    {generateMasterAllIssuesPrompt({
+                      audit: currentAudit,
+                      issues,
+                      framework: promptFramework,
+                      websiteUrl: currentAudit?.website_url || (issues[0]?.page_url) || 'https://example.com'
+                    })}
+                  </code>
+                </pre>
+                <button
+                  onClick={handleCopyMasterPrompt}
+                  className="absolute top-3 right-3 p-2 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors"
+                  title="Copy Prompt"
+                >
+                  {masterPromptCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -363,14 +534,55 @@ export default function IssuesPage() {
                     </h3>
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                    {/* Copy AI Prompt for this single issue */}
+                    <button
+                      onClick={() => handleCopySinglePrompt(issue)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-sm shadow-emerald-500/20 active:scale-95 transition-all"
+                      title="Generate and copy engineered AI fix prompt for this issue"
+                    >
+                      {copiedPromptIssueId === issue.id ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-white" />
+                          <span>Prompt Copied!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Bot className="w-3.5 h-3.5 text-emerald-200" />
+                          <span>🤖 Copy AI Fix Prompt</span>
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      onClick={() => setExpandedPromptIssueId(expandedPromptIssueId === issue.id ? null : issue.id)}
+                      className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                        expandedPromptIssueId === issue.id
+                          ? 'bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-800'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                      }`}
+                      title="Inspect AI prompt for this issue"
+                    >
+                      {expandedPromptIssueId === issue.id ? (
+                        <>
+                          <EyeOff className="w-3.5 h-3.5" />
+                          <span>Hide</span>
+                        </>
+                      ) : (
+                        <>
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>View Prompt</span>
+                        </>
+                      )}
+                    </button>
+
                     {issue.severity !== 'passed' && !resolvedIssueIds.has(issue.id) && (
                       <button
                         onClick={() => handleOpenAntigravity(issue)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 shadow-sm shadow-indigo-500/20 active:scale-95 transition-all"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm shadow-indigo-500/20 active:scale-95 transition-all"
                       >
-                        <Cpu className="w-3.5 h-3.5 text-indigo-200 animate-pulse" />
-                        <span>⚡ Fix with Antigravity</span>
+                        <Cpu className="w-3.5 h-3.5 text-indigo-200" />
+                        <span>Antigravity Fix</span>
                       </button>
                     )}
 
@@ -409,6 +621,45 @@ export default function IssuesPage() {
                     <p className="text-slate-500 dark:text-slate-400 leading-relaxed">{issue.recommendation}</p>
                   </div>
                 </div>
+
+                {/* Inline Single Issue AI Fix Prompt Inspector */}
+                {expandedPromptIssueId === issue.id && (
+                  <div className="p-4 rounded-xl bg-slate-950 border border-emerald-500/30 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Bot className="w-4 h-4 text-emerald-400" />
+                        <span className="text-xs font-bold text-white">
+                          Engineered AI Solution Prompt for &quot;{issue.title}&quot;
+                        </span>
+                        <span className="text-[10px] px-2 py-0.5 rounded bg-indigo-900/60 text-indigo-300 font-mono font-bold">
+                          {promptFramework.toUpperCase()}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => handleCopySinglePrompt(issue)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
+                      >
+                        {copiedPromptIssueId === issue.id ? (
+                          <>
+                            <Check className="w-3 h-3" />
+                            <span>Copied!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3 h-3" />
+                            <span>Copy Prompt</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    <pre className="p-3.5 rounded-lg bg-slate-900 text-slate-200 text-xs font-mono overflow-x-auto max-h-56 border border-slate-800 leading-relaxed">
+                      <code>{generateSingleIssuePrompt(issue, promptFramework)}</code>
+                    </pre>
+                    <p className="text-[11px] text-slate-400">
+                      💡 Paste this prompt into ChatGPT, Claude, Gemini, or Antigravity to get an instant zero-placeholder fix.
+                    </p>
+                  </div>
+                )}
 
                 {/* Suggested Fix Section */}
                 {issue.suggested_fix && (

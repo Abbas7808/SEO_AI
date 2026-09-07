@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Sparkles, ArrowRight, Lock, Mail, User, AlertCircle } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
 export default function RegisterPage() {
+  const [searchParams] = useSearchParams();
+  const redirectUrl = searchParams.get('redirect');
+
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -33,7 +36,11 @@ export default function RegisterPage() {
 
     try {
       await register(name, email, password, confirmPassword);
-      navigate('/dashboard');
+      if (redirectUrl) {
+        navigate(`/dashboard/new?url=${encodeURIComponent(redirectUrl)}`);
+      } else {
+        navigate('/dashboard');
+      }
     } catch (err) {
       setError(err.message || 'Registration failed.');
     } finally {

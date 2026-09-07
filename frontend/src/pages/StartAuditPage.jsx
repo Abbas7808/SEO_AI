@@ -87,7 +87,7 @@ export default function StartAuditPage() {
       }
 
       await new Promise((r) => setTimeout(r, 500));
-      navigate(`/dashboard/roadmap?auditId=${auditId}`);
+      navigate(`/dashboard/issues?auditId=${auditId}&promptReady=true`);
     } catch (err) {
       setError(err.message || 'Failed to start audit. Please verify the URL.');
       setAuditProgress(null);

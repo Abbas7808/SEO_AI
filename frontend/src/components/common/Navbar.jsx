@@ -16,15 +16,15 @@ export default function Navbar() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2.5 group">
-            <div className="w-10 h-10 rounded-xl bg-brand-600 text-white flex items-center justify-center shadow-md shadow-brand-500/20 group-hover:scale-105 transition-transform">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-brand-500/20 group-hover:scale-105 transition-transform">
               <Sparkles className="w-5 h-5" />
             </div>
             <div className="flex flex-col">
-              <span className="font-bold text-lg leading-tight tracking-tight text-slate-900 dark:text-white">
-                AI SEO <span className="text-brand-600 dark:text-brand-400">Auditor</span>
+              <span className="font-extrabold text-lg leading-tight tracking-tight text-slate-900 dark:text-white">
+                siteglow<span className="text-brand-600 dark:text-brand-400">-ai</span>
               </span>
-              <span className="text-[10px] uppercase font-semibold tracking-widest text-slate-500 dark:text-slate-400">
-                Engine & Optimizer
+              <span className="text-[10px] uppercase font-bold tracking-widest text-slate-500 dark:text-slate-400">
+                SEO Intelligence
               </span>
             </div>
           </Link>
@@ -39,9 +39,6 @@ export default function Navbar() {
             </a>
             <a href="#how-it-works" className="hover:text-brand-600 dark:hover:text-brand-400 transition-colors">
               How It Works
-            </a>
-            <a href="#pricing" className="hover:text-brand-600 dark:hover:text-brand-400 transition-colors">
-              Pricing
             </a>
           </nav>
 
@@ -124,13 +121,6 @@ export default function Navbar() {
             className="block py-2 text-base font-medium text-slate-700 dark:text-slate-200 hover:text-brand-600"
           >
             How It Works
-          </a>
-          <a
-            href="#pricing"
-            onClick={() => setMobileMenuOpen(false)}
-            className="block py-2 text-base font-medium text-slate-700 dark:text-slate-200 hover:text-brand-600"
-          >
-            Pricing
           </a>
           <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex flex-col gap-2">
             {isAuthenticated ? (
