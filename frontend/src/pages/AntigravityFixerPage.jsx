@@ -245,7 +245,7 @@ export default function AntigravityFixerPage() {
               <span className="text-3xl font-black text-gray-200">{currentScore}</span>
               <span className="text-xs text-gray-400 block">/100</span>
             </div>
-            <ArrowRight className="h-6 w-6 text-emerald-400 animate-bounce-x" />
+            <ArrowRight className="h-6 w-6 text-emerald-400 animate-pulse" />
             <div className="text-center">
               <span className="text-xs text-emerald-400 block font-medium uppercase">Antigravity Projected</span>
               <span className="text-3xl font-black text-emerald-400">{projectedFinalScore}</span>
@@ -415,7 +415,14 @@ export default function AntigravityFixerPage() {
               <div className="p-5 sm:p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="space-y-1.5">
                   <div className="flex flex-wrap items-center gap-2">
-                    {getSeverityBadge(repair.severity)}
+                    {(() => {
+                      const badge = getSeverityBadge(repair.severity);
+                      return (
+                        <span className={`px-2.5 py-0.5 rounded-md text-xs font-extrabold uppercase tracking-wider border ${badge.bg}`}>
+                          {badge.text}
+                        </span>
+                      );
+                    })()}
                     <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
                       Antigravity Verified &bull; {repair.confidence}% Confidence
                     </span>
