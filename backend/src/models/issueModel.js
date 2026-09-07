@@ -59,6 +59,19 @@ const issueModel = {
       counts.total += parseInt(row.count, 10);
     }
     return counts;
+  },
+
+  async findById(id) {
+    const rows = await db.query('SELECT * FROM seo_issues WHERE id = ?', [id]);
+    return rows && rows.length > 0 ? rows[0] : null;
+  },
+
+  async updateStatus(id, status = 'resolved') {
+    const result = await db.query(
+      'UPDATE seo_issues SET status = ? WHERE id = ?',
+      [status, id]
+    );
+    return result;
   }
 };
 

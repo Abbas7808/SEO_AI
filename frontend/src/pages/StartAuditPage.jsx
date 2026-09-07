@@ -47,7 +47,9 @@ export default function StartAuditPage() {
     'Checking image alt attributes & sizes',
     'Checking internal & external link health',
     'Checking Schema.org structured data',
-    'Calculating 0–100 weighted SEO score',
+    'Connecting Google Antigravity Autonomous Auto-Fixer (DeepMind Core)',
+    'Synthesizing 4-phase SEO roadmap & backlit words',
+    'Calculating 0–100 weighted SEO score & generating patches',
     'Generating AI analysis & priority recommendations',
   ];
 

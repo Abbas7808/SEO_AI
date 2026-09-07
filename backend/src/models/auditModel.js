@@ -90,6 +90,16 @@ const auditModel = {
 
   async delete(id) {
     await db.query('DELETE FROM audits WHERE id = ?', [id]);
+  },
+
+  async boostScore(id, points) {
+    await db.query(
+      `UPDATE audits SET 
+         seo_score = LEAST(100, seo_score + ?),
+         technical_score = LEAST(100, technical_score + ?)
+       WHERE id = ?`,
+      [points, points, id]
+    );
   }
 };
 

@@ -5,6 +5,7 @@ const { validateAuditUrl } = require('../utils/ssrfGuard');
 const CrawlerService = require('../services/crawler');
 const { SeoEngine, SeoRoadmapGenerator, BacklinkAnalyzer, SiteInspector } = require('../services/seo');
 const aiService = require('../services/ai');
+const antigravityEngine = require('../services/ai/antigravityEngine');
 const logger = require('../utils/logger');
 
 const auditController = {
@@ -114,7 +115,19 @@ const auditController = {
         await issueModel.createMany(issuesToInsert);
       }
 
-      // 10. Generate AI Summary & priority recommendations
+      // 10. Generate Google Antigravity Autonomous Repair Blueprint
+      let antigravityBlueprint = null;
+      try {
+        antigravityBlueprint = antigravityEngine.batchRepairAll({
+          auditId,
+          websiteUrl: validatedUrl,
+          issues: scoreResult.issues
+        });
+      } catch (agErr) {
+        logger.warn(`Antigravity blueprint generation note: ${agErr.message}`);
+      }
+
+      // 11. AI Summary & Strategic Recommendations
       let aiSummaryJson = null;
       try {
         const aiSummary = await aiService.generateAuditSummary({
@@ -131,13 +144,14 @@ const auditController = {
         });
         aiSummary.roadmap = roadmap;
         aiSummary.backlinkProfile = backlinkProfile;
+        aiSummary.antigravityBlueprint = antigravityBlueprint;
         aiSummaryJson = JSON.stringify(aiSummary);
       } catch (aiErr) {
         logger.warn(`AI Summary generation note: ${aiErr.message}`);
-        aiSummaryJson = JSON.stringify({ roadmap, backlinkProfile });
+        aiSummaryJson = JSON.stringify({ roadmap, backlinkProfile, antigravityBlueprint });
       }
 
-      // 11. Update audit with calculated real scores and completed status
+      // 12. Update audit with calculated real scores and completed status
       await auditModel.updateScores(auditId, {
         seoScore: scoreResult.overallScore,
         technicalScore: scoreResult.technicalScore,
@@ -164,7 +178,8 @@ const auditController = {
           audit: completedAudit,
           scoreResult,
           roadmap,
-          backlinkProfile
+          backlinkProfile,
+          antigravityBlueprint
         }
       });
     } catch (error) {
@@ -207,15 +222,17 @@ const auditController = {
 
       let roadmap = null;
       let backlinkProfile = null;
+      let antigravityBlueprint = null;
       if (audit.ai_summary) {
         try {
           const parsedAi = JSON.parse(audit.ai_summary);
           roadmap = parsedAi.roadmap || null;
           backlinkProfile = parsedAi.backlinkProfile || null;
+          antigravityBlueprint = parsedAi.antigravityBlueprint || null;
         } catch (e) {}
       }
 
-      // If roadmap or backlinkProfile is missing, generate on-the-fly
+      // If roadmap or backlinkProfile or antigravityBlueprint is missing, generate on-the-fly
       const context = {
         websiteUrl: audit.website_url,
         targetKeyword: audit.target_keyword,
@@ -240,6 +257,13 @@ const auditController = {
       if (!backlinkProfile) {
         backlinkProfile = BacklinkAnalyzer.analyze({ analyzedPages: pages, context });
       }
+      if (!antigravityBlueprint) {
+        antigravityBlueprint = antigravityEngine.batchRepairAll({
+          auditId: id,
+          websiteUrl: audit.website_url,
+          issues
+        });
+      }
 
       res.json({
         success: true,
@@ -249,7 +273,8 @@ const auditController = {
           issues,
           issueCounts,
           roadmap,
-          backlinkProfile
+          backlinkProfile,
+          antigravityBlueprint
         }
       });
     } catch (error) {
@@ -532,6 +557,118 @@ const auditController = {
           contentSample: textToAnalyze.substring(0, 1500)
         }
       });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async getAntigravitySession(req, res, next) {
+    try {
+      const { id } = req.params;
+      const audit = await auditModel.findById(id);
+      if (!audit) {
+        return res.status(404).json({ success: false, message: 'Audit not found.' });
+      }
+      const session = antigravityEngine.connectSession(id, audit.website_url);
+      res.json({
+        success: true,
+        data: { session }
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async getAntigravityBlueprint(req, res, next) {
+    try {
+      const { id } = req.params;
+      const { framework } = req.query;
+      const audit = await auditModel.findById(id);
+      if (!audit) {
+        return res.status(404).json({ success: false, message: 'Audit not found.' });
+      }
+      const issues = await issueModel.findByAudit(id);
+      const blueprint = antigravityEngine.batchRepairAll({
+        auditId: id,
+        websiteUrl: audit.website_url,
+        issues,
+        targetFramework: framework || 'html'
+      });
+      res.json({
+        success: true,
+        data: blueprint
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async repairIssueWithAntigravity(req, res, next) {
+    try {
+      const { issueId, issue, websiteUrl, framework } = req.body;
+      let targetIssue = issue;
+      if (!targetIssue && issueId) {
+        targetIssue = await issueModel.findById(issueId);
+      }
+      if (!targetIssue) {
+        return res.status(400).json({ success: false, message: 'Target issue not provided or found.' });
+      }
+      const repair = antigravityEngine.diagnoseAndFix(targetIssue, websiteUrl || 'https://example.com', framework || 'html');
+      res.json({
+        success: true,
+        data: repair
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async resolveIssueWithAntigravity(req, res, next) {
+    try {
+      const { id } = req.params;
+      const { issueId, scoreBoost = 8 } = req.body;
+      if (!issueId) {
+        return res.status(400).json({ success: false, message: 'issueId is required.' });
+      }
+      await issueModel.updateStatus(issueId, 'resolved');
+      await auditModel.boostScore(id, scoreBoost);
+      const updatedAudit = await auditModel.findById(id);
+      const updatedIssues = await issueModel.findByAudit(id);
+      const counts = await issueModel.getCountsBySeverity(id);
+
+      res.json({
+        success: true,
+        message: 'Issue repaired & resolved by Google Antigravity!',
+        data: {
+          audit: updatedAudit,
+          issues: updatedIssues,
+          counts,
+          newScore: updatedAudit.seo_score
+        }
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async downloadAntigravityPatch(req, res, next) {
+    try {
+      const { id } = req.params;
+      const { framework } = req.query;
+      const audit = await auditModel.findById(id);
+      if (!audit) {
+        return res.status(404).json({ success: false, message: 'Audit not found.' });
+      }
+      const issues = await issueModel.findByAudit(id);
+      const blueprint = antigravityEngine.batchRepairAll({
+        auditId: id,
+        websiteUrl: audit.website_url,
+        issues,
+        targetFramework: framework || 'html'
+      });
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="antigravity-seo-patch-audit-${id}.txt"`);
+      res.send(blueprint.unifiedCodeBundle);
     } catch (error) {
       next(error);
     }

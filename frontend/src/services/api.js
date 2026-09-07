@@ -68,6 +68,17 @@ export const reportsApi = {
   },
 };
 
+export const antigravityApi = {
+  getSession: (auditId) => api.get(`/audits/${auditId}/antigravity/session`),
+  getBlueprint: (auditId, framework = 'html') => api.get(`/audits/${auditId}/antigravity/blueprint`, { params: { framework } }),
+  repairIssue: (data) => api.post('/audits/antigravity/repair-issue', data),
+  resolveIssue: (auditId, data) => api.post(`/audits/${auditId}/antigravity/resolve-issue`, data),
+  getPatchDownloadUrl: (auditId, framework = 'html') => {
+    const base = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/$/, '') : '';
+    return `${base}/api/audits/${auditId}/antigravity/download-patch?framework=${framework}`;
+  },
+};
+
 export const healthApi = {
   check: () => api.get('/health'),
 };

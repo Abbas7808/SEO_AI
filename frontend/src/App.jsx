@@ -15,6 +15,7 @@ import IssuesPage from './pages/IssuesPage';
 import PageAnalysisPage from './pages/PageAnalysisPage';
 import RoadmapPage from './pages/RoadmapPage';
 import BacklitWordsPage from './pages/BacklitWordsPage';
+import AntigravityFixerPage from './pages/AntigravityFixerPage';
 import SiteInspectorPage from './pages/SiteInspectorPage';
 import CompetitorComparePage from './pages/CompetitorComparePage';
 import AIConsultantPage from './pages/AIConsultantPage';
@@ -37,6 +38,7 @@ export default function App() {
         <Route index element={<DashboardOverview />} />
         <Route path="new" element={<StartAuditPage />} />
         <Route path="roadmap" element={<RoadmapPage />} />
+        <Route path="antigravity" element={<AntigravityFixerPage />} />
         <Route path="backlit-words" element={<BacklitWordsPage />} />
         <Route path="issues" element={<IssuesPage />} />
         <Route path="pages" element={<PageAnalysisPage />} />

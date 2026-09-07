@@ -320,6 +320,51 @@ async function runTests() {
     assert.strictEqual(result.backlitKeywords.length > 0, true);
   });
 
+  // 6. Google Antigravity Autonomous Repair Engine Tests
+  console.log('--- 6. Google Antigravity Autonomous SEO Auto-Fixer ---');
+  const antigravityEngine = require('../src/services/ai/antigravityEngine');
+
+  await itAsync('Should establish Google Antigravity agentic session handshake', async () => {
+    const session = antigravityEngine.connectSession(42, 'https://myenterprisesite.com');
+    assert.strictEqual(session.connected, true);
+    assert.strictEqual(session.protocol.includes('DeepMind'), true);
+    assert.strictEqual(session.capabilities.length >= 5, true);
+  });
+
+  await itAsync('Should autonomously synthesize multi-framework patch and diff for missing H1', async () => {
+    const repair = antigravityEngine.diagnoseAndFix(
+      { id: 101, issue_type: 'missing_h1', title: 'Missing H1 Heading Tag' },
+      'https://myenterprisesite.com',
+      'nextjs'
+    );
+    assert.strictEqual(repair.scoreBoost > 0, true);
+    assert.strictEqual(repair.confidence > 90, true);
+    assert.strictEqual(repair.activePatch.includes('<h1'), true);
+    assert.strictEqual(repair.diffView.includes('+'), true);
+    assert.strictEqual(repair.agentExecutionSteps.length >= 4, true);
+  });
+
+  await itAsync('Should execute Antigravity batch repair across all audit issues and compile unified patch', async () => {
+    const mockIssues = [
+      { id: 1, issue_type: 'missing_meta_description', severity: 'critical', title: 'Missing Meta Description' },
+      { id: 2, issue_type: 'images_missing_alt', severity: 'high', title: 'Images Missing Alt Text' },
+      { id: 3, issue_type: 'missing_schema', severity: 'medium', title: 'Missing Schema JSON-LD' },
+      { id: 4, issue_type: 'https_active', severity: 'passed', title: 'HTTPS Enforced' }
+    ];
+
+    const batch = antigravityEngine.batchRepairAll({
+      auditId: 99,
+      websiteUrl: 'https://myenterprisesite.com',
+      issues: mockIssues,
+      targetFramework: 'html'
+    });
+
+    assert.strictEqual(batch.totalIssuesFound, 4);
+    assert.strictEqual(batch.repairableIssuesCount, 3, 'Should repair all non-passed issues');
+    assert.strictEqual(batch.projectedScoreBoost > 0, true);
+    assert.strictEqual(batch.unifiedCodeBundle.includes('GOOGLE ANTIGRAVITY'), true);
+  });
+
   console.log(`\n========================================`);
   console.log(`🏁 Unit Tests Completed: ${passed} Passed, ${failed} Failed.`);
   console.log(`========================================\n`);

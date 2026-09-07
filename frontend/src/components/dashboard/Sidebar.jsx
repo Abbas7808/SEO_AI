@@ -16,7 +16,8 @@ import {
   ChevronRight,
   Milestone,
   FileSearch,
-  GitCompare
+  GitCompare,
+  Cpu
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -28,6 +29,7 @@ export default function Sidebar({ mobileOpen, setMobileOpen }) {
     { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true },
     { to: '/dashboard/new', label: 'Start Audit', icon: Search },
     { to: '/dashboard/roadmap', label: 'SEO Roadmap', icon: Milestone, badge: 'New' },
+    { to: '/dashboard/antigravity', label: 'Antigravity Auto-Fixer', icon: Cpu, badge: 'Agent' },
     { to: '/dashboard/backlit-words', label: 'Backlit Words & Links', icon: Sparkles, badge: 'AI' },
     { to: '/dashboard/issues', label: 'SEO Issues', icon: AlertTriangle },
     { to: '/dashboard/pages', label: 'Page Analysis', icon: Layers },
