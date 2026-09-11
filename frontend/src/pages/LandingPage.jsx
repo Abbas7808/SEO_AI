@@ -304,7 +304,7 @@ export default function LandingPage() {
             </h2>
 
             <p className="text-sm sm:text-base text-slate-300 max-w-xl mx-auto leading-relaxed">
-              Detect every hidden SEO vulnerability, generate master AI repair prompts, and boost organic traffic with precision.
+              Detect every hidden SEO vulnerability, unlock instant production code solutions, and boost organic traffic with precision.
             </p>
 
             <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3.5">

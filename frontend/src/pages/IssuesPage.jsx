@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle,
   Search,
@@ -12,44 +12,41 @@ import {
   ChevronDown,
   ChevronUp,
   Code2,
-  Milestone,
-  Link2,
-  Cpu,
-  Zap,
   Terminal,
   X,
   ArrowRight,
   ShieldCheck,
   RefreshCw,
-  Bot,
-  FileText,
-  Download,
+  Smartphone,
+  Monitor,
+  Zap,
+  BookOpen,
   Eye,
-  EyeOff
+  Award,
+  HelpCircle,
+  FileCode,
+  Layers,
+  CheckCircle
 } from 'lucide-react';
 import { auditApi, antigravityApi } from '../services/api';
 import { getSeverityBadge } from '../utils/formatters';
-import { generateSingleIssuePrompt, generateMasterAllIssuesPrompt } from '../utils/promptGenerator';
+import { getIssueSolution } from '../utils/issueSolutions';
+import DualScoreHero from '../components/common/DualScoreHero';
+import SeoSkillsGuide from '../components/common/SeoSkillsGuide';
 
 export default function IssuesPage() {
   const [searchParams] = useSearchParams();
   const auditId = searchParams.get('auditId');
-  const promptReady = searchParams.get('promptReady') === 'true';
 
   const [issues, setIssues] = useState([]);
   const [currentAudit, setCurrentAudit] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeFilter, setActiveFilter] = useState('all');
+  const [activeSeverityFilter, setActiveSeverityFilter] = useState('all');
+  const [activeCategoryFilter, setActiveCategoryFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [copiedId, setCopiedId] = useState(null);
-  const [expandedIssue, setExpandedIssue] = useState(null);
-
-  // High-Professional AI Prompt Studio states
-  const [promptFramework, setPromptFramework] = useState('react');
-  const [masterPromptExpanded, setMasterPromptExpanded] = useState(true);
-  const [masterPromptCopied, setMasterPromptCopied] = useState(false);
-  const [copiedPromptIssueId, setCopiedPromptIssueId] = useState(null);
-  const [expandedPromptIssueId, setExpandedPromptIssueId] = useState(null);
+  const [expandedIssueId, setExpandedIssueId] = useState(null);
+  const [codeFrameworkMap, setCodeFrameworkMap] = useState({}); // { [issueId]: 'html' | 'react' | 'wordpress' }
 
   // Antigravity Auto-Fixer Modal state
   const [antigravityModalIssue, setAntigravityModalIssue] = useState(null);
@@ -59,69 +56,82 @@ export default function IssuesPage() {
   const [modalCopied, setModalCopied] = useState(false);
   const [resolvedIssueIds, setResolvedIssueIds] = useState(new Set());
 
-  // Mock initial demo issues if newly loaded without specific backend audit items
+  // Demo fallback issues if no backend audit loaded
   const demoIssues = [
     {
       id: 1,
       severity: 'critical',
-      issue_type: 'missing_h1',
-      title: 'Missing H1 Heading Tag',
+      issue_type: 'missing_viewport',
+      category: 'mobile',
+      title: 'Missing Mobile Viewport Meta Tag',
       page_url: 'https://example.com/',
-      description: 'The page does not contain a top-level <h1> heading tag.',
-      impact: 'Search engines rely heavily on the H1 tag to identify the primary subject matter of the page.',
-      recommendation: 'Add a single, descriptive <h1> element that encapsulates the primary page keyword.',
-      suggested_fix: '<h1>Professional SEO Audit & Optimization Services</h1>',
+      description: 'The page lacks a <meta name="viewport"> tag in the HTML head. Mobile devices cannot scale the page layout correctly.',
+      impact: 'Fails Google Mobile-Friendly test and triggers ranking penalties under Google Mobile-First Indexing.',
+      recommendation: 'Add <meta name="viewport" content="width=device-width, initial-scale=1.0"> to the document <head>.',
+      suggested_fix: '<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />',
     },
     {
       id: 2,
-      severity: 'high',
-      issue_type: 'missing_meta_description',
-      title: 'Missing Meta Description',
-      page_url: 'https://example.com/about',
-      description: 'The page does not contain a <meta name="description"> tag.',
-      impact: 'Search engines may generate an arbitrary and unsuitable search snippet, lowering click-through rates (CTR).',
-      recommendation: 'Add a unique, relevant meta description between 120 and 160 characters.',
-      suggested_fix: '<meta name="description" content="Discover how our SEO intelligence engine audits web performance, tracks indexing issues, and delivers automated AI-powered fixes.">',
+      severity: 'critical',
+      issue_type: 'missing_h1',
+      category: 'onpage',
+      title: 'Missing H1 Heading Tag',
+      page_url: 'https://example.com/',
+      description: 'The page does not contain a top-level <h1> heading tag in the document body.',
+      impact: 'Search engines rely heavily on the H1 tag to identify the primary subject matter of the page.',
+      recommendation: 'Add a single, descriptive <h1> element that encapsulates the primary page keyword.',
+      suggested_fix: '<h1>Professional Web Solutions & SEO Optimization Services</h1>',
     },
     {
       id: 3,
       severity: 'high',
-      issue_type: 'images_missing_alt',
-      title: '12 Images Missing Alt Text',
-      page_url: 'https://example.com/services',
-      description: 'Multiple <img> elements lack descriptive alt attributes.',
-      impact: 'Impedes web accessibility for screen readers and deprives the website of Google Image Search traffic.',
-      recommendation: 'Add meaningful alt attributes describing the graphic content or context of each image.',
-      suggested_fix: '<img src="/assets/cctv-camera.jpg" alt="High-definition 4K indoor security CCTV camera" />',
+      issue_type: 'missing_meta_description',
+      category: 'onpage',
+      title: 'Missing Meta Description Tag',
+      page_url: 'https://example.com/about',
+      description: 'The page does not contain a <meta name="description"> tag in the HTML head.',
+      impact: 'Search engines generate an arbitrary snippet, often pulling cookie banners or menus, lowering organic CTR.',
+      recommendation: 'Add a unique, relevant meta description between 120 and 160 characters.',
+      suggested_fix: '<meta name="description" content="Discover our verified digital platform. Learn how our automated auditing tools and solutions drive organic growth.">',
     },
     {
       id: 4,
+      severity: 'high',
+      issue_type: 'images_missing_alt',
+      category: 'content',
+      title: 'Images Missing Alt Text Attributes',
+      page_url: 'https://example.com/services',
+      description: 'Multiple <img> elements lack descriptive alt attributes for accessibility and image search.',
+      impact: 'Impedes web accessibility for screen readers and deprives the website of Google Image Search traffic.',
+      recommendation: 'Add meaningful alt attributes describing the graphic content or context of each image.',
+      suggested_fix: '<img src="/assets/interface-preview.webp" alt="Website analytics dashboard showing mobile and desktop SEO metrics" loading="lazy" />',
+    },
+    {
+      id: 5,
       severity: 'medium',
       issue_type: 'missing_schema',
-      title: 'Missing Organization / LocalBusiness Schema',
+      category: 'schema',
+      title: 'Missing Schema.org JSON-LD Structured Data',
       page_url: 'https://example.com/',
       description: 'No JSON-LD structured data detected on the homepage.',
-      impact: 'Restricts Google Knowledge Graph eligibility and rich search snippet enhancements.',
+      impact: 'Restricts Google Knowledge Graph eligibility and rich search snippet enhancements in SERP.',
       recommendation: 'Implement JSON-LD Schema.org markup for Organization or LocalBusiness.',
       suggested_fix: `<script type="application/ld+json">
 {
   "@context": "https://schema.org",
-  "@type": "LocalBusiness",
-  "name": "Safdar Mobile Store",
-  "telephone": "+92-300-1234567",
-  "address": {
-    "@type": "PostalAddress",
-    "addressLocality": "Hangu",
-    "addressRegion": "KPK"
-  }
+  "@type": "Organization",
+  "name": "My Enterprise",
+  "url": "https://example.com",
+  "logo": "https://example.com/logo.png"
 }
 </script>`,
     },
     {
-      id: 5,
+      id: 6,
       severity: 'low',
-      issue_type: 'no_canonical',
-      title: 'Self-referencing Canonical Missing',
+      issue_type: 'missing_canonical',
+      category: 'technical',
+      title: 'Self-referencing Canonical Tag Missing',
       page_url: 'https://example.com/contact',
       description: 'Page does not declare a canonical link rel="canonical".',
       impact: 'May risk duplicate content flags if accessed via parameter URLs or trailing slashes.',
@@ -129,9 +139,10 @@ export default function IssuesPage() {
       suggested_fix: '<link rel="canonical" href="https://example.com/contact" />',
     },
     {
-      id: 6,
+      id: 7,
       severity: 'passed',
-      issue_type: 'https_active',
+      issue_type: 'secure_https',
+      category: 'technical',
       title: 'Valid SSL & HTTPS Active',
       page_url: 'https://example.com/',
       description: 'The site enforces strong HTTPS encryption with valid TLS certificate.',
@@ -165,17 +176,27 @@ export default function IssuesPage() {
           }
           if (issuesRes?.data?.issues && issuesRes.data.issues.length > 0) {
             setIssues(issuesRes.data.issues);
+            // Expand first critical or high issue automatically
+            const firstImportant = issuesRes.data.issues.find(i => i.severity === 'critical' || i.severity === 'high');
+            if (firstImportant) setExpandedIssueId(firstImportant.id);
           } else {
-            const targetSite = loadedAudit?.website_url || 'https://siteglow-ai.com';
-            setIssues(demoIssues.map(i => ({ ...i, page_url: i.page_url ? i.page_url.replace('https://example.com', targetSite.replace(/\/$/, '')) : targetSite })));
+            const targetSite = loadedAudit?.website_url || 'https://example.com';
+            const mappedDemo = demoIssues.map(i => ({
+              ...i,
+              page_url: i.page_url ? i.page_url.replace('https://example.com', targetSite.replace(/\/$/, '')) : targetSite
+            }));
+            setIssues(mappedDemo);
+            setExpandedIssueId(mappedDemo[0].id);
           }
         } catch (err) {
           setIssues(demoIssues);
+          setExpandedIssueId(demoIssues[0].id);
         } finally {
           setLoading(false);
         }
       } else {
         setIssues(demoIssues);
+        setExpandedIssueId(demoIssues[0].id);
         setLoading(false);
       }
     }
@@ -188,45 +209,6 @@ export default function IssuesPage() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const handleCopyMasterPrompt = () => {
-    const text = generateMasterAllIssuesPrompt({
-      audit: currentAudit,
-      issues,
-      framework: promptFramework,
-      websiteUrl: currentAudit?.website_url || (issues[0]?.page_url) || 'https://example.com'
-    });
-    navigator.clipboard.writeText(text);
-    setMasterPromptCopied(true);
-    setTimeout(() => setMasterPromptCopied(false), 2500);
-  };
-
-  const handleCopySinglePrompt = (issue) => {
-    const text = generateSingleIssuePrompt({
-      issue,
-      websiteUrl: issue.page_url || currentAudit?.website_url || 'https://example.com',
-      framework: promptFramework
-    });
-    navigator.clipboard.writeText(text);
-    setCopiedPromptIssueId(issue.id);
-    setTimeout(() => setCopiedPromptIssueId(null), 2500);
-  };
-
-  const handleDownloadMasterPrompt = () => {
-    const text = generateMasterAllIssuesPrompt({
-      audit: currentAudit,
-      issues,
-      framework: promptFramework,
-      websiteUrl: currentAudit?.website_url || (issues[0]?.page_url) || 'https://example.com'
-    });
-    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `master-seo-ai-fix-prompt-${promptFramework}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
   const handleOpenAntigravity = async (issue, framework = modalFramework) => {
     setAntigravityModalIssue(issue);
     setAntigravityLoading(true);
@@ -234,7 +216,7 @@ export default function IssuesPage() {
     try {
       const res = await antigravityApi.repairIssue({
         issue,
-        websiteUrl: issue.page_url || 'https://example.com',
+        websiteUrl: issue.page_url || currentAudit?.website_url || 'https://example.com',
         framework
       });
       if (res?.data) {
@@ -254,667 +236,546 @@ export default function IssuesPage() {
     }
   };
 
-  const handleApplyAndResolve = async (issueId, scoreBoost = 10) => {
-    if (auditId && !issueId.toString().startsWith('demo')) {
-      try {
-        await antigravityApi.resolveIssue(auditId, { issueId, scoreBoost });
-      } catch (err) {
-        console.error('Error resolving issue:', err);
+  const handleToggleResolve = (issueId) => {
+    setResolvedIssueIds(prev => {
+      const next = new Set(prev);
+      if (next.has(issueId)) {
+        next.delete(issueId);
+      } else {
+        next.add(issueId);
       }
-    }
-    setResolvedIssueIds(prev => new Set([...prev, issueId]));
-    setAntigravityModalIssue(null);
+      return next;
+    });
+  };
+
+  const setIssueFramework = (issueId, fw) => {
+    setCodeFrameworkMap(prev => ({ ...prev, [issueId]: fw }));
   };
 
   // Filter and search
   const filteredIssues = issues.filter((issue) => {
-    const matchesFilter = activeFilter === 'all' || issue.severity === activeFilter;
+    const solution = getIssueSolution(issue, currentAudit?.website_url);
+    const matchesSeverity = activeSeverityFilter === 'all' || issue.severity === activeSeverityFilter;
+    
+    let matchesCategory = true;
+    if (activeCategoryFilter === 'mobile') {
+      matchesCategory = solution.deviceTarget === 'Mobile' || solution.category === 'Mobile SEO';
+    } else if (activeCategoryFilter === 'desktop') {
+      matchesCategory = solution.deviceTarget === 'Desktop' || solution.category.includes('Desktop') || solution.category === 'Technical SEO';
+    } else if (activeCategoryFilter === 'onpage') {
+      matchesCategory = solution.category.includes('On-Page');
+    } else if (activeCategoryFilter === 'performance') {
+      matchesCategory = solution.category.includes('Performance') || solution.category.includes('Speed');
+    } else if (activeCategoryFilter === 'resolved') {
+      matchesCategory = resolvedIssueIds.has(issue.id);
+    }
+
+    const query = searchQuery.toLowerCase();
     const matchesSearch =
-      issue.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (issue.page_url && issue.page_url.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (issue.issue_type && issue.issue_type.toLowerCase().includes(searchQuery.toLowerCase()));
-    return matchesFilter && matchesSearch;
+      (issue.title && issue.title.toLowerCase().includes(query)) ||
+      (issue.description && issue.description.toLowerCase().includes(query)) ||
+      (issue.page_url && issue.page_url.toLowerCase().includes(query)) ||
+      (solution.category && solution.category.toLowerCase().includes(query));
+
+    return matchesSeverity && matchesCategory && matchesSearch;
   });
 
-  const counts = {
-    all: issues.length,
-    critical: issues.filter((i) => i.severity === 'critical').length,
-    high: issues.filter((i) => i.severity === 'high').length,
-    medium: issues.filter((i) => i.severity === 'medium').length,
-    low: issues.filter((i) => i.severity === 'low').length,
-    passed: issues.filter((i) => i.severity === 'passed').length,
-  };
-
-  const navigate = useNavigate();
+  const criticalCount = issues.filter(i => i.severity === 'critical').length;
+  const highCount = issues.filter(i => i.severity === 'high').length;
+  const mediumCount = issues.filter(i => i.severity === 'medium').length;
+  const passedCount = issues.filter(i => i.severity === 'passed').length;
 
   return (
-    <div className="space-y-8">
-      {/* Audit Completion Prompt-Ready Banner */}
-      {promptReady && (
-        <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-emerald-950 via-teal-950 to-slate-950 border-2 border-emerald-500/60 text-white shadow-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-fade-in">
-          <div className="flex items-center gap-3.5">
-            <div className="p-2.5 bg-emerald-500/20 border border-emerald-500/30 rounded-xl text-emerald-400 shrink-0">
-              <Sparkles className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2 mb-0.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-                <span className="text-[10px] font-extrabold text-emerald-400 uppercase tracking-wider">
-                  Audit Analysis Complete &bull; AI Prompts Synthesized
-                </span>
-              </div>
-              <h3 className="text-sm sm:text-base font-bold text-white">
-                Master AI Solution Prompt Ready for All {issues.length} Detected Issues
-              </h3>
-              <p className="text-xs text-slate-300 mt-0.5">
-                Paste the unified prompt into ChatGPT, Claude, or Gemini to resolve all vulnerabilities in a single prompt.
-              </p>
-            </div>
-          </div>
+    <div className="space-y-8 max-w-7xl mx-auto pb-16">
+      {/* 1. DUAL SCORE HERO DISPLAY (Mobile SEO & Desktop SEO Score) */}
+      <DualScoreHero audit={currentAudit} scoreResult={currentAudit} />
 
-          <button
-            onClick={handleCopyMasterPrompt}
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-extrabold bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-lg shadow-emerald-500/30 transition-all hover:scale-105 active:scale-95 shrink-0"
-          >
-            {masterPromptCopied ? (
-              <>
-                <Check className="w-4 h-4 text-slate-950" />
-                <span>Prompt Copied!</span>
-              </>
-            ) : (
-              <>
-                <Copy className="w-4 h-4 text-slate-950" />
-                <span>📋 Copy Master AI Prompt</span>
-              </>
-            )}
-          </button>
-        </div>
-      )}
+      {/* 2. HOW TO IMPROVE YOUR SEO SKILLS SECTION */}
+      <SeoSkillsGuide audit={currentAudit} scoreResult={currentAudit} />
 
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-            SEO Issues & Fixes
-          </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Detailed diagnostic findings detected during the audit with actionable code and content remedies.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={handleCopyMasterPrompt}
-            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm shadow-emerald-500/20 transition-all"
-          >
-            {masterPromptCopied ? <Check className="w-3.5 h-3.5" /> : <Bot className="w-3.5 h-3.5" />}
-            <span>{masterPromptCopied ? 'Master Prompt Copied!' : '📋 Copy Master AI Prompt'}</span>
-          </button>
-
-          <button
-            onClick={() => navigate(`/dashboard/roadmap${auditId ? `?auditId=${auditId}` : ''}`)}
-            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-brand-600 hover:bg-brand-700 text-white shadow-sm shadow-brand-500/20 transition-all"
-          >
-            <Milestone className="w-3.5 h-3.5" />
-            <span>View Full Roadmap</span>
-          </button>
-
-          <button
-            onClick={() => navigate(`/dashboard/backlit-words${auditId ? `?auditId=${auditId}` : ''}`)}
-            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-violet-600 hover:bg-violet-700 text-white shadow-sm shadow-violet-500/20 transition-all"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Backlit Words & Links</span>
-          </button>
-        </div>
-      </div>
-
-      {/* High-Professional Master AI Solution Prompt Studio */}
-      <div className="bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 rounded-2xl p-5 sm:p-6 text-white border border-indigo-500/40 shadow-2xl relative overflow-hidden">
-        {/* Glow backdrop decorative */}
-        <div className="absolute top-0 right-0 -mt-8 -mr-8 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 left-1/3 -mb-8 w-48 h-48 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
-
-        <div className="relative z-10 flex flex-col gap-5">
-          {/* Header Row */}
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div className="flex items-start gap-3.5">
-              <div className="p-3 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl shrink-0 shadow-lg shadow-indigo-500/30 text-white">
-                <Bot className="w-6 h-6" />
+      {/* 3. WEBSITE ISSUES & RESOLUTION CENTER */}
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center font-bold">
+                <AlertTriangle className="w-5 h-5" />
               </div>
               <div>
-                <div className="flex items-center gap-2 mb-1 flex-wrap">
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
-                    Master AI Solution Prompt
-                  </span>
-                  <span className="text-[11px] font-medium text-slate-400">
-                    Solves All {issues.length} Detected Issues in One Shot
-                  </span>
-                </div>
-                <h2 className="text-lg sm:text-xl font-extrabold text-white tracking-tight">
-                  High-Professional AI Prompt Studio
+                <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                  Website SEO Issues & Direct Code Solutions
                 </h2>
-                <p className="text-xs text-slate-300 max-w-2xl mt-1 leading-relaxed">
-                  Engineered prompt compiling all audit vulnerabilities. Paste this directly into <span className="text-indigo-300 font-semibold">ChatGPT-4o</span>, <span className="text-purple-300 font-semibold">Claude 3.5 Sonnet</span>, <span className="text-sky-300 font-semibold">Gemini 1.5 Pro</span>, or <span className="text-amber-300 font-semibold">Google Antigravity</span> to generate 100% production-ready, zero-placeholder code fixes.
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  Complete diagnosis, algorithm impact, and step-by-step website code solutions for every detected vulnerability.
                 </p>
               </div>
             </div>
-
-            {/* Top Action Buttons */}
-            <div className="flex items-center gap-2.5 flex-wrap shrink-0">
-              <button
-                onClick={handleCopyMasterPrompt}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-lg shadow-emerald-500/25 transition-all hover:scale-[1.02] active:scale-[0.98]"
-              >
-                {masterPromptCopied ? (
-                  <>
-                    <Check className="w-4 h-4 text-white" />
-                    <span>Copied to Clipboard!</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-4 h-4 text-emerald-100" />
-                    <span>📋 Copy Master AI Prompt</span>
-                  </>
-                )}
-              </button>
-
-              <button
-                onClick={handleDownloadMasterPrompt}
-                title="Download prompt as text file"
-                className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-bold bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-200 transition-colors"
-              >
-                <Download className="w-3.5 h-3.5 text-slate-300" />
-                <span>.txt</span>
-              </button>
-
-              <button
-                onClick={() => setMasterPromptExpanded(!masterPromptExpanded)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-bold bg-indigo-950/60 hover:bg-indigo-900/80 border border-indigo-500/30 text-indigo-200 transition-colors"
-              >
-                {masterPromptExpanded ? (
-                  <>
-                    <EyeOff className="w-3.5 h-3.5" />
-                    <span>Hide</span>
-                  </>
-                ) : (
-                  <>
-                    <Eye className="w-3.5 h-3.5" />
-                    <span>Preview Prompt</span>
-                  </>
-                )}
-              </button>
-            </div>
           </div>
 
-          {/* Framework Switcher Bar */}
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-800/80">
-            <div className="flex items-center gap-2">
-              <Code2 className="w-4 h-4 text-indigo-400" />
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                Select Your Tech Stack:
-              </span>
-            </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="px-3 py-1 rounded-xl text-xs font-bold bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900">
+              {criticalCount} Critical
+            </span>
+            <span className="px-3 py-1 rounded-xl text-xs font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-900">
+              {highCount} High
+            </span>
+            <span className="px-3 py-1 rounded-xl text-xs font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900">
+              {resolvedIssueIds.size} Resolved
+            </span>
+          </div>
+        </div>
 
-            <div className="flex flex-wrap gap-1.5">
+        {/* Filter Controls Bar */}
+        <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3">
+          {/* Search Input */}
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search issues by title, affected page URL, or optimization category..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 text-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+            />
+          </div>
+
+          {/* Category & Device Filter Pills */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+            <div className="flex flex-wrap items-center gap-1.5 text-xs font-bold">
+              <span className="text-slate-400 text-[11px] uppercase tracking-wider mr-1 hidden sm:inline">
+                Category:
+              </span>
               {[
-                { id: 'react', label: 'Next.js / React' },
-                { id: 'html', label: 'HTML5 / CSS / Vanilla JS' },
-                { id: 'wordpress', label: 'WordPress (PHP)' },
-                { id: 'shopify', label: 'Shopify (Liquid)' },
-                { id: 'vue', label: 'Vue.js / Nuxt' },
-              ].map((fw) => (
+                { id: 'all', label: 'All Issues' },
+                { id: 'mobile', label: '📱 Mobile SEO' },
+                { id: 'desktop', label: '💻 Desktop & Tech' },
+                { id: 'onpage', label: '🏷️ On-Page SEO' },
+                { id: 'performance', label: '⚡ Speed & Perf' },
+                { id: 'resolved', label: `✅ Resolved (${resolvedIssueIds.size})` }
+              ].map((cat) => (
                 <button
-                  key={fw.id}
-                  onClick={() => setPromptFramework(fw.id)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                    promptFramework === fw.id
-                      ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 border border-indigo-400/30'
-                      : 'bg-slate-800/60 text-slate-300 hover:bg-slate-800 hover:text-white border border-slate-700/50'
+                  key={cat.id}
+                  type="button"
+                  onClick={() => setActiveCategoryFilter(cat.id)}
+                  className={`px-3 py-1.5 rounded-xl transition ${
+                    activeCategoryFilter === cat.id
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
                   }`}
                 >
-                  {fw.label}
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Severity Filter Pills */}
+            <div className="flex items-center gap-1.5 text-xs font-bold">
+              <span className="text-slate-400 text-[11px] uppercase tracking-wider mr-1 hidden md:inline">
+                Severity:
+              </span>
+              {['all', 'critical', 'high', 'medium', 'low', 'passed'].map((sev) => (
+                <button
+                  key={sev}
+                  type="button"
+                  onClick={() => setActiveSeverityFilter(sev)}
+                  className={`px-2.5 py-1 rounded-lg capitalize transition ${
+                    activeSeverityFilter === sev
+                      ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-black'
+                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  {sev}
                 </button>
               ))}
             </div>
           </div>
-
-          {/* Expanded Prompt Preview Window */}
-          {masterPromptExpanded && (
-            <div className="space-y-2 mt-1">
-              <div className="flex items-center justify-between text-[11px] text-slate-400 px-1">
-                <span className="font-mono flex items-center gap-1.5">
-                  <Terminal className="w-3 h-3 text-emerald-400" />
-                  Auto-formatted for LLM Reasoning Engines &bull; Target: <span className="text-white font-bold">{promptFramework.toUpperCase()}</span>
-                </span>
-                <span>Click &quot;Copy Master AI Prompt&quot; to transfer into any LLM</span>
-              </div>
-              <div className="relative">
-                <pre className="p-4 rounded-xl bg-slate-950/90 border border-slate-800 text-slate-300 text-xs font-mono max-h-72 overflow-y-auto leading-relaxed selection:bg-indigo-600 selection:text-white">
-                  <code>
-                    {generateMasterAllIssuesPrompt({
-                      audit: currentAudit,
-                      issues,
-                      framework: promptFramework,
-                      websiteUrl: currentAudit?.website_url || (issues[0]?.page_url) || 'https://example.com'
-                    })}
-                  </code>
-                </pre>
-                <button
-                  onClick={handleCopyMasterPrompt}
-                  className="absolute top-3 right-3 p-2 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors"
-                  title="Copy Prompt"
-                >
-                  {masterPromptCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                </button>
-              </div>
-            </div>
-          )}
         </div>
-      </div>
 
-      {/* Severity Counters Bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        {[
-          { key: 'all', label: 'All Issues', count: counts.all, color: 'slate' },
-          { key: 'critical', label: 'Critical', count: counts.critical, color: 'rose' },
-          { key: 'high', label: 'High Priority', count: counts.high, color: 'orange' },
-          { key: 'medium', label: 'Medium', count: counts.medium, color: 'amber' },
-          { key: 'low', label: 'Low / Minor', count: counts.low, color: 'blue' },
-          { key: 'passed', label: 'Passed Checks', count: counts.passed, color: 'emerald' },
-        ].map((item) => (
-          <button
-            key={item.key}
-            onClick={() => setActiveFilter(item.key)}
-            className={`p-3 rounded-xl border text-left transition-all ${
-              activeFilter === item.key
-                ? 'border-brand-500 ring-2 ring-brand-500/20 bg-brand-50/50 dark:bg-brand-950/40'
-                : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300'
-            }`}
-          >
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
-              {item.label}
-            </span>
-            <span className="text-xl font-extrabold text-slate-900 dark:text-white">
-              {item.count}
-            </span>
-          </button>
-        ))}
-      </div>
-
-      {/* Search & Filter Controls */}
-      <div className="flex flex-col sm:flex-row items-center gap-3">
-        <div className="relative flex-1 w-full">
-          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-            <Search className="w-4 h-4" />
+        {/* Issues List */}
+        {loading ? (
+          <div className="text-center py-16 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 space-y-3">
+            <RefreshCw className="w-8 h-8 text-indigo-500 animate-spin mx-auto" />
+            <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">
+              Loading website SEO issues and compiling code solutions...
+            </p>
           </div>
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search issues by title, URL, or type..."
-            className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-          />
-        </div>
-      </div>
-
-      {/* Issues List */}
-      <div className="space-y-4">
-        {filteredIssues.length === 0 ? (
-          <div className="text-center py-16 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800">
-            <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
-            <h3 className="text-base font-bold text-slate-900 dark:text-white">No Issues Found</h3>
-            <p className="text-xs text-slate-500">All checks in this category are in good standing.</p>
+        ) : filteredIssues.length === 0 ? (
+          <div className="text-center py-16 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 space-y-3">
+            <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto" />
+            <h3 className="text-base font-bold text-slate-900 dark:text-white">
+              No matching issues found
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+              Your website has no issues matching the selected filters. Great work!
+            </p>
           </div>
         ) : (
-          filteredIssues.map((issue) => {
-            const badge = getSeverityBadge(issue.severity);
-            const isExpanded = expandedIssue === issue.id;
+          <div className="space-y-4">
+            {filteredIssues.map((issue) => {
+              const isExpanded = expandedIssueId === issue.id;
+              const isResolved = resolvedIssueIds.has(issue.id);
+              const solution = getIssueSolution(issue, currentAudit?.website_url);
+              const currentFramework = codeFrameworkMap[issue.id] || 'html';
+              const codeToDisplay = solution.codeFixes[currentFramework] || solution.codeFixes.html;
 
-            return (
-              <div
-                key={issue.id}
-                className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4 transition-all"
-              >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <span className={`px-2.5 py-0.5 rounded-md text-xs font-extrabold uppercase tracking-wider border ${badge.bg}`}>
-                      {badge.text}
-                    </span>
-                    <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                      {issue.title}
-                    </h3>
-                  </div>
-
-                  <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                    {/* Copy AI Prompt for this single issue */}
-                    <button
-                      onClick={() => handleCopySinglePrompt(issue)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-sm shadow-emerald-500/20 active:scale-95 transition-all"
-                      title="Generate and copy engineered AI fix prompt for this issue"
-                    >
-                      {copiedPromptIssueId === issue.id ? (
-                        <>
-                          <Check className="w-3.5 h-3.5 text-white" />
-                          <span>Prompt Copied!</span>
-                        </>
-                      ) : (
-                        <>
-                          <Bot className="w-3.5 h-3.5 text-emerald-200" />
-                          <span>🤖 Copy AI Fix Prompt</span>
-                        </>
-                      )}
-                    </button>
-
-                    <button
-                      onClick={() => setExpandedPromptIssueId(expandedPromptIssueId === issue.id ? null : issue.id)}
-                      className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                        expandedPromptIssueId === issue.id
-                          ? 'bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-800'
-                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                      }`}
-                      title="Inspect AI prompt for this issue"
-                    >
-                      {expandedPromptIssueId === issue.id ? (
-                        <>
-                          <EyeOff className="w-3.5 h-3.5" />
-                          <span>Hide</span>
-                        </>
-                      ) : (
-                        <>
-                          <Eye className="w-3.5 h-3.5" />
-                          <span>View Prompt</span>
-                        </>
-                      )}
-                    </button>
-
-                    {issue.severity !== 'passed' && !resolvedIssueIds.has(issue.id) && (
+              return (
+                <div
+                  key={issue.id}
+                  className={`rounded-3xl border transition-all duration-200 overflow-hidden ${
+                    isResolved
+                      ? 'border-emerald-200/80 dark:border-emerald-900/60 bg-emerald-50/20 dark:bg-emerald-950/10 opacity-75'
+                      : isExpanded
+                      ? 'border-indigo-300 dark:border-indigo-800 bg-white dark:bg-slate-900 shadow-md'
+                      : 'border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-700'
+                  }`}
+                >
+                  {/* Issue Card Header Bar */}
+                  <div className="p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-start gap-3.5 min-w-0">
+                      {/* Checkbox for Mark Resolved */}
                       <button
-                        onClick={() => handleOpenAntigravity(issue)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm shadow-indigo-500/20 active:scale-95 transition-all"
+                        type="button"
+                        onClick={() => handleToggleResolve(issue.id)}
+                        className={`mt-0.5 w-6 h-6 rounded-lg border flex items-center justify-center transition shrink-0 ${
+                          isResolved
+                            ? 'bg-emerald-600 border-emerald-600 text-white'
+                            : 'border-slate-300 dark:border-slate-700 hover:border-emerald-500'
+                        }`}
+                        title={isResolved ? 'Mark as Unresolved' : 'Mark as Resolved on Website'}
                       >
-                        <Cpu className="w-3.5 h-3.5 text-indigo-200" />
-                        <span>Antigravity Fix</span>
+                        {isResolved && <Check className="w-4 h-4" />}
                       </button>
-                    )}
 
-                    {resolvedIssueIds.has(issue.id) && (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                        Resolved
-                      </span>
-                    )}
+                      <div className="min-w-0 space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {getSeverityBadge(issue.severity)}
+                          <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/60">
+                            {solution.category}
+                          </span>
+                          <span className={`px-2 py-0.5 rounded-md text-[11px] font-bold ${
+                            solution.deviceTarget === 'Mobile'
+                              ? 'bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400'
+                              : 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400'
+                          }`}>
+                            {solution.deviceTarget} Target
+                          </span>
+                          {isResolved && (
+                            <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400">
+                              Resolved
+                            </span>
+                          )}
+                        </div>
 
-                    {issue.page_url && (
-                      <a
-                        href={issue.page_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-slate-400 hover:text-brand-600 dark:hover:text-brand-400 flex items-center gap-1 font-mono truncate max-w-xs"
-                      >
-                        <span className="truncate">{issue.page_url}</span>
-                        <ExternalLink className="w-3.5 h-3.5 shrink-0" />
-                      </a>
-                    )}
-                  </div>
-                </div>
+                        <h3 className={`text-base font-bold text-slate-900 dark:text-white ${isResolved ? 'line-through text-slate-400' : ''}`}>
+                          {issue.title}
+                        </h3>
 
-                <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-                  {issue.description}
-                </p>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 text-xs">
-                  <div>
-                    <span className="font-bold text-slate-800 dark:text-slate-200 block mb-1">Why It Matters (Impact):</span>
-                    <p className="text-slate-500 dark:text-slate-400 leading-relaxed">{issue.impact}</p>
-                  </div>
-                  <div>
-                    <span className="font-bold text-slate-800 dark:text-slate-200 block mb-1">Recommended Action:</span>
-                    <p className="text-slate-500 dark:text-slate-400 leading-relaxed">{issue.recommendation}</p>
-                  </div>
-                </div>
-
-                {/* Inline Single Issue AI Fix Prompt Inspector */}
-                {expandedPromptIssueId === issue.id && (
-                  <div className="p-4 rounded-xl bg-slate-950 border border-emerald-500/30 space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Bot className="w-4 h-4 text-emerald-400" />
-                        <span className="text-xs font-bold text-white">
-                          Engineered AI Solution Prompt for &quot;{issue.title}&quot;
-                        </span>
-                        <span className="text-[10px] px-2 py-0.5 rounded bg-indigo-900/60 text-indigo-300 font-mono font-bold">
-                          {promptFramework.toUpperCase()}
-                        </span>
+                        <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 truncate">
+                          <span className="truncate">URL: {issue.page_url || currentAudit?.website_url || 'https://example.com'}</span>
+                          {issue.page_url && (
+                            <a
+                              href={issue.page_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-indigo-500 hover:text-indigo-600 shrink-0 inline-flex items-center gap-0.5"
+                            >
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          )}
+                        </div>
                       </div>
-                      <button
-                        onClick={() => handleCopySinglePrompt(issue)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
-                      >
-                        {copiedPromptIssueId === issue.id ? (
-                          <>
-                            <Check className="w-3 h-3" />
-                            <span>Copied!</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-3 h-3" />
-                            <span>Copy Prompt</span>
-                          </>
-                        )}
-                      </button>
                     </div>
-                    <pre className="p-3.5 rounded-lg bg-slate-900 text-slate-200 text-xs font-mono overflow-x-auto max-h-56 border border-slate-800 leading-relaxed">
-                      <code>{generateSingleIssuePrompt(issue, promptFramework)}</code>
-                    </pre>
-                    <p className="text-[11px] text-slate-400">
-                      💡 Paste this prompt into ChatGPT, Claude, Gemini, or Antigravity to get an instant zero-placeholder fix.
-                    </p>
-                  </div>
-                )}
 
-                {/* Suggested Fix Section */}
-                {issue.suggested_fix && (
-                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-bold text-brand-600 dark:text-brand-400 flex items-center gap-1.5">
+                    {/* Action Controls */}
+                    <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenAntigravity(issue)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition"
+                      >
                         <Sparkles className="w-3.5 h-3.5" />
-                        AI Suggested Implementation / Fix
-                      </span>
+                        <span>Interactive Auto-Fixer</span>
+                      </button>
+
                       <button
-                        onClick={() => handleCopy(issue.suggested_fix, issue.id)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-brand-500 transition-colors"
+                        type="button"
+                        onClick={() => setExpandedIssueId(isExpanded ? null : issue.id)}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
                       >
-                        {copiedId === issue.id ? (
-                          <>
-                            <Check className="w-3 h-3 text-emerald-500" />
-                            <span className="text-emerald-600 dark:text-emerald-400 font-bold">Copied!</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-3 h-3" />
-                            <span>Copy Fix</span>
-                          </>
-                        )}
+                        <span>{isExpanded ? 'Hide Solution' : 'View How to Solve'}</span>
+                        {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                       </button>
                     </div>
-
-                    <pre className="p-3.5 rounded-xl bg-slate-900 text-slate-200 text-xs font-mono overflow-x-auto border border-slate-800">
-                      <code>{issue.suggested_fix}</code>
-                    </pre>
                   </div>
-                )}
-              </div>
-            );
-          })
+
+                  {/* Expanded Issue Resolution Drawer */}
+                  {isExpanded && (
+                    <div className="px-6 pb-6 pt-2 border-t border-slate-100 dark:border-slate-800 space-y-6">
+                      {/* 1. What is the Issue & Impact */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60 space-y-1.5">
+                          <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                            <AlertTriangle className="w-4 h-4 text-amber-500" />
+                            What is the Issue (Diagnosis)
+                          </div>
+                          <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                            {solution.diagnosis}
+                          </p>
+                        </div>
+
+                        <div className="p-4 rounded-2xl bg-rose-50/40 dark:bg-rose-950/20 border border-rose-200/50 dark:border-rose-900/40 space-y-1.5">
+                          <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-rose-700 dark:text-rose-400">
+                            <Zap className="w-4 h-4 text-rose-500" />
+                            Why It Matters (Search Engine Impact)
+                          </div>
+                          <p className="text-xs text-rose-900 dark:text-rose-300 leading-relaxed">
+                            {solution.impact}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* 2. Step-by-Step Instructions: How to Solve */}
+                      <div className="space-y-2.5">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                          <BookOpen className="w-4 h-4 text-indigo-500" />
+                          Step-by-Step: How to Solve This Issue on Your Website
+                        </h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                          {solution.steps.map((step, idx) => (
+                            <div
+                              key={idx}
+                              className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60 text-xs font-medium text-slate-700 dark:text-slate-200 flex items-start gap-2.5"
+                            >
+                              <span className="w-5 h-5 rounded-full bg-indigo-600 text-white font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">
+                                {idx + 1}
+                              </span>
+                              <span>{step}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* 3. Direct Production Code Fix (Multi-Framework) */}
+                      <div className="space-y-2">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                            <Code2 className="w-4 h-4 text-sky-500" />
+                            Ready-to-Copy Production Code Fix
+                          </h4>
+
+                          {/* Framework Tabs */}
+                          <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold">
+                            {[
+                              { id: 'html', label: 'HTML / Vanilla' },
+                              { id: 'react', label: 'React / Next.js' },
+                              { id: 'wordpress', label: 'WordPress PHP' }
+                            ].map((fw) => (
+                              <button
+                                key={fw.id}
+                                type="button"
+                                onClick={() => setIssueFramework(issue.id, fw.id)}
+                                className={`px-2.5 py-1 rounded-lg transition ${
+                                  currentFramework === fw.id
+                                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                                }`}
+                              >
+                                {fw.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Code Block with One-Click Copy */}
+                        <div className="relative rounded-2xl bg-slate-950 border border-slate-800 overflow-hidden">
+                          <div className="flex items-center justify-between px-4 py-2 bg-slate-900/90 border-b border-slate-800 text-xs text-slate-400">
+                            <div className="flex items-center gap-2">
+                              <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
+                              <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+                              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                              <span className="font-mono text-[11px] ml-2 text-slate-300">
+                                {currentFramework.toUpperCase()} Implementation
+                              </span>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleCopy(codeToDisplay, `fix-${issue.id}`)}
+                              className="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition"
+                            >
+                              {copiedId === `fix-${issue.id}` ? (
+                                <>
+                                  <Check className="w-3.5 h-3.5 text-emerald-300" />
+                                  <span>Copied Code!</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-3.5 h-3.5" />
+                                  <span>Copy Solution Code</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+
+                          <pre className="p-4 text-xs font-mono text-slate-100 overflow-x-auto leading-relaxed">
+                            <code>{codeToDisplay}</code>
+                          </pre>
+                        </div>
+                      </div>
+
+                      {/* 4. Verification Checklist */}
+                      <div className="p-4 rounded-2xl bg-emerald-50/30 dark:bg-emerald-950/20 border border-emerald-200/50 dark:border-emerald-900/40 space-y-2">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-400 flex items-center gap-1.5">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                          How to Test & Verify This Fix on Your Live Website
+                        </h4>
+                        <ul className="space-y-1 text-xs text-emerald-900 dark:text-emerald-300 font-medium">
+                          {solution.verification.map((v, vIdx) => (
+                            <li key={vIdx} className="flex items-start gap-2">
+                              <span className="text-emerald-500 font-bold">&bull;</span>
+                              <span>{v}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      {/* Bottom Controls */}
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
+                        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                          Estimated Score Gain: <strong className="text-emerald-600 dark:text-emerald-400">+{solution.scoreBoost} SEO Points</strong>
+                        </span>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleResolve(issue.id)}
+                            className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                              isResolved
+                                ? 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+                                : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm'
+                            }`}
+                          >
+                            <Check className="w-4 h-4" />
+                            <span>{isResolved ? 'Mark as Open' : 'Mark as Fixed on Website'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
 
-      {/* Antigravity Quick-Fix Interactive Modal */}
+      {/* 4. ANTIGRAVITY AUTO-FIXER MODAL */}
       {antigravityModalIssue && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-indigo-500/30 overflow-hidden">
-            {/* Modal Header */}
-            <div className="p-5 bg-gradient-to-r from-gray-950 via-indigo-950 to-purple-950 text-white flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-indigo-600/40 rounded-lg border border-indigo-400/30 text-indigo-300">
-                  <Cpu className="w-5 h-5 animate-pulse" />
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl p-6 sm:p-8 space-y-6">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center">
+                  <Sparkles className="w-5 h-5" />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-                    <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">
-                      Google Antigravity Agent v2.4
-                    </span>
-                  </div>
-                  <h3 className="text-base sm:text-lg font-bold">
-                    {antigravityModalIssue.title}
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                    Direct Code Auto-Fixer
                   </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Fix for: {antigravityModalIssue.title}
+                  </p>
                 </div>
               </div>
-
               <button
+                type="button"
                 onClick={() => setAntigravityModalIssue(null)}
-                className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+                className="p-2 rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Modal Body */}
-            <div className="p-6 overflow-y-auto space-y-6 flex-1 text-slate-900 dark:text-slate-100">
-              {antigravityLoading ? (
-                <div className="py-12 text-center space-y-3">
-                  <RefreshCw className="w-8 h-8 text-indigo-500 animate-spin mx-auto" />
-                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                    Google Antigravity is synthesizing an autonomous code fix...
-                  </p>
-                  <p className="text-xs text-slate-500 font-mono">
-                    Decompiling AST &bull; Checking Google Search Quality Guidelines
-                  </p>
-                </div>
-              ) : antigravityRepair ? (
-                <>
-                  {/* Antigravity Insight & Boost */}
-                  <div className="p-4 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 flex items-start gap-3">
-                    <Sparkles className="w-5 h-5 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
-                    <div className="text-xs space-y-1">
-                      <div className="flex items-center gap-2">
-                        <strong className="text-indigo-950 dark:text-indigo-200 font-bold">Antigravity Diagnostic:</strong>
-                        <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-extrabold text-[10px]">
-                          +{antigravityRepair.scoreBoost} SEO Pts
-                        </span>
-                        <span className="text-slate-500 font-medium text-[10px]">
-                          {antigravityRepair.confidence}% Confidence
-                        </span>
-                      </div>
-                      <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
-                        {antigravityRepair.agentInsight}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Framework Syntax Switcher */}
-                  <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
-                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                      Patch Target Framework:
-                    </span>
-                    <div className="flex gap-1.5">
-                      {[
-                        { id: 'html', label: 'HTML / Head' },
-                        { id: 'react', label: 'Next.js / React' },
-                        { id: 'wordpress', label: 'WordPress PHP' }
-                      ].map(fw => (
-                        <button
-                          key={fw.id}
-                          onClick={() => handleFrameworkChange(fw.id)}
-                          className={`px-3 py-1 text-xs font-bold rounded-lg transition-colors ${
-                            modalFramework === fw.id
-                              ? 'bg-indigo-600 text-white shadow'
-                              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
-                          }`}
-                        >
-                          {fw.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Side-by-Side Diff */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div className="rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50/40 dark:bg-red-950/20 overflow-hidden">
-                      <div className="px-3 py-1.5 bg-red-100/60 dark:bg-red-900/40 border-b border-red-200 dark:border-red-900/40 text-[10px] font-bold text-red-700 dark:text-red-300 uppercase tracking-wider">
-                        Original Failing State
-                      </div>
-                      <pre className="p-3 text-xs font-mono text-red-900 dark:text-red-300 overflow-x-auto whitespace-pre-wrap">
-                        {antigravityRepair.originalCode}
-                      </pre>
-                    </div>
-
-                    <div className="rounded-xl border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/40 dark:bg-emerald-950/20 overflow-hidden">
-                      <div className="px-3 py-1.5 bg-emerald-100/60 dark:bg-emerald-900/40 border-b border-emerald-200 dark:border-emerald-900/40 text-[10px] font-bold text-emerald-700 dark:text-emerald-300 uppercase tracking-wider">
-                        Antigravity Patched Code [{modalFramework.toUpperCase()}]
-                      </div>
-                      <pre className="p-3 text-xs font-mono text-emerald-950 dark:text-emerald-200 overflow-x-auto whitespace-pre-wrap">
-                        {antigravityRepair.patches?.[modalFramework] || antigravityRepair.activePatch}
-                      </pre>
-                    </div>
-                  </div>
-
-                  {/* Agent Steps Mini-Terminal */}
-                  <div className="rounded-xl bg-slate-950 p-3.5 font-mono text-[11px] text-slate-300 space-y-1">
-                    <div className="text-slate-500 pb-1 border-b border-slate-800 flex items-center gap-2">
-                      <Terminal className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>Antigravity Agent Execution Sequence</span>
-                    </div>
-                    {antigravityRepair.agentExecutionSteps?.map((step, i) => (
-                      <div key={i} className="flex items-start gap-2">
-                        <span className="text-slate-600 select-none">&gt;</span>
-                        <span className={step.action === 'PATCH_READY' ? 'text-emerald-400 font-bold' : 'text-slate-300'}>
-                          [{step.action}] {step.message}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              ) : null}
+            {/* Framework Selector */}
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs font-bold text-slate-600 dark:text-slate-300">
+                Select Your Tech Stack:
+              </span>
+              <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold">
+                {['html', 'react', 'wordpress'].map((fw) => (
+                  <button
+                    key={fw}
+                    type="button"
+                    onClick={() => handleFrameworkChange(fw)}
+                    className={`px-3 py-1.5 rounded-lg capitalize transition ${
+                      modalFramework === fw
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    {fw === 'html' ? 'HTML' : fw === 'react' ? 'Next.js / React' : 'WordPress'}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            {/* Modal Footer */}
-            {antigravityRepair && (
-              <div className="p-4 bg-slate-50 dark:bg-slate-800/60 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3">
-                <button
-                  onClick={() => {
-                    const code = antigravityRepair.patches?.[modalFramework] || antigravityRepair.activePatch;
-                    navigator.clipboard.writeText(code);
-                    setModalCopied(true);
-                    setTimeout(() => setModalCopied(false), 2000);
-                  }}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 hover:bg-slate-100 transition-colors"
-                >
-                  {modalCopied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-slate-500" />}
-                  <span>{modalCopied ? 'Copied to Clipboard!' : 'Copy Code Patch'}</span>
-                </button>
+            {/* Code Output */}
+            {antigravityLoading ? (
+              <div className="py-12 text-center space-y-2">
+                <RefreshCw className="w-8 h-8 text-indigo-500 animate-spin mx-auto" />
+                <p className="text-xs font-semibold text-slate-500">Generating clean code fix...</p>
+              </div>
+            ) : antigravityRepair ? (
+              <div className="space-y-4">
+                <div className="p-3.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200/60 dark:border-indigo-900/60 text-xs text-indigo-900 dark:text-indigo-300 leading-relaxed">
+                  <strong>Fix Insight:</strong> {antigravityRepair.agentInsight || 'Direct standards-compliant syntax patch ready to paste into your website templates.'}
+                </div>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setAntigravityModalIssue(null)}
-                    className="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-                  >
-                    Close
-                  </button>
-
-                  <button
-                    onClick={() => handleApplyAndResolve(antigravityModalIssue.id, antigravityRepair.scoreBoost)}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-600/20 active:scale-95 transition-all"
-                  >
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Apply &amp; Resolve (+{antigravityRepair.scoreBoost} pts)</span>
-                  </button>
+                <div className="rounded-2xl bg-slate-950 border border-slate-800 overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-2 bg-slate-900 border-b border-slate-800">
+                    <span className="text-xs font-mono text-slate-300">Production Ready Snippet</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(antigravityRepair.activePatch);
+                        setModalCopied(true);
+                        setTimeout(() => setModalCopied(false), 2000);
+                      }}
+                      className="px-3 py-1 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white"
+                    >
+                      {modalCopied ? 'Copied!' : 'Copy Code'}
+                    </button>
+                  </div>
+                  <pre className="p-4 text-xs font-mono text-slate-100 overflow-x-auto leading-relaxed">
+                    <code>{antigravityRepair.activePatch}</code>
+                  </pre>
                 </div>
               </div>
+            ) : (
+              <p className="text-xs text-slate-500 text-center py-6">
+                Code repair ready. Click Copy Code to paste into your project.
+              </p>
             )}
+
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setAntigravityModalIssue(null)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  handleToggleResolve(antigravityModalIssue.id);
+                  setAntigravityModalIssue(null);
+                }}
+                className="px-5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/20"
+              >
+                Mark as Fixed on Website
+              </button>
+            </div>
           </div>
         </div>
       )}

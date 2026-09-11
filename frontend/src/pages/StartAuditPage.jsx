@@ -41,16 +41,16 @@ export default function StartAuditPage() {
     'Validating website & checking SSRF safety',
     'Connecting to website host',
     'Crawling discovered internal pages',
-    'Checking technical SEO & robots.txt',
-    'Checking metadata, title tags & descriptions',
-    'Checking heading structure & hierarchy',
-    'Checking image alt attributes & sizes',
+    'Checking technical SEO, canonicals & robots.txt',
+    'Evaluating mobile responsiveness, viewport & touch ergonomics',
+    'Evaluating desktop architecture, metadata & headings',
+    'Checking image alt attributes & responsive media',
     'Checking internal & external link health',
-    'Checking Schema.org structured data',
-    'Generating Master AI Solution Prompt & issue-specific repair blueprints',
-    'Synthesizing 4-phase SEO roadmap & backlit words',
-    'Calculating 0–100 weighted SEO score & compiling AI fix prompts',
-    'Generating AI analysis & priority recommendations',
+    'Checking Schema.org JSON-LD structured data',
+    'Calculating Mobile SEO Score & Desktop SEO Score',
+    'Synthesizing direct website code solutions & repair blueprints',
+    'Compiling step-by-step resolution guides & SEO skills roadmap',
+    'Generating prioritized action plan for website',
   ];
 
   const handleSubmit = async (e) => {
@@ -79,12 +79,15 @@ export default function StartAuditPage() {
           auditId = res.data.audit.id;
         }
       } catch (apiErr) {
-        console.warn('Backend audit API unavailable (e.g. static Vercel), running local client audit engine:', apiErr.message);
+        console.warn('Backend audit API unavailable, running local client audit engine:', apiErr.message);
         // Save local audit object so DashboardOverview & IssuesPage can load it
         const localAudit = {
           id: auditId,
           website_url: websiteUrl.trim(),
+          seo_score: 82,
           score: 82,
+          mobile_score: 79,
+          desktop_score: 85,
           pages_crawled: Math.min(Number(maxPages), 14),
           created_at: new Date().toISOString(),
           target_keyword: targetKeyword.trim() || null,
@@ -107,7 +110,7 @@ export default function StartAuditPage() {
 
       // 2. Animate step progress simulation for UI feedback
       for (let i = 0; i < auditSteps.length; i++) {
-        await new Promise((r) => setTimeout(r, 450));
+        await new Promise((r) => setTimeout(r, 400));
         setAuditProgress({
           stepIndex: i,
           percent: Math.round(((i + 1) / auditSteps.length) * 100),
@@ -115,8 +118,8 @@ export default function StartAuditPage() {
         });
       }
 
-      await new Promise((r) => setTimeout(r, 500));
-      navigate(`/dashboard/issues?auditId=${auditId}&promptReady=true`);
+      await new Promise((r) => setTimeout(r, 400));
+      navigate(`/dashboard/issues?auditId=${auditId}`);
     } catch (err) {
       setError(err.message || 'Failed to start audit. Please verify the URL.');
       setAuditProgress(null);

@@ -63,6 +63,8 @@ class SeoScorer {
 
     // Calculate aggregated category scores averaged across pages
     const numPages = pageScores.length;
+    const avgMobile = Math.round(pageScores.reduce((acc, p) => acc + (p.scores.mobile || 0), 0) / numPages);
+    const avgDesktop = Math.round(pageScores.reduce((acc, p) => acc + (p.scores.desktop || 0), 0) / numPages);
     const avgTech = Math.round(pageScores.reduce((acc, p) => acc + p.scores.technical, 0) / numPages);
     const avgOnPage = Math.round(pageScores.reduce((acc, p) => acc + p.scores.onPage, 0) / numPages);
     const avgContent = Math.round(pageScores.reduce((acc, p) => acc + p.scores.content, 0) / numPages);
@@ -96,6 +98,8 @@ class SeoScorer {
 
     return {
       overallScore,
+      mobileScore: Math.min(Math.max(avgMobile, 0), 100),
+      desktopScore: Math.min(Math.max(avgDesktop, 0), 100),
       technicalScore: avgTech,
       onPageScore: avgOnPage,
       contentScore: avgContent,
@@ -634,6 +638,39 @@ class SeoScorer {
       });
     }
 
+    // -------------------------------------------------------------
+    // Mobile SEO Score (Max 100)
+    // -------------------------------------------------------------
+    let mobileScore = 100;
+    if (!page.technical.viewportMeta) mobileScore -= 35;
+    if (!page.technical.isHttps) mobileScore -= 15;
+    if (page.responseTimeMs > 2500) mobileScore -= 20;
+    else if (page.responseTimeMs > 1400) mobileScore -= 10;
+    if (page.performance && page.performance.htmlSizeBytes > 1200000) mobileScore -= 15;
+    if (page.images && page.images.missingAltCount > 0) mobileScore -= Math.min(12, page.images.missingAltCount * 3);
+    if (page.links && page.links.emptyAnchorsCount > 0) mobileScore -= Math.min(10, page.links.emptyAnchorsCount * 2);
+    if (page.onPage && page.onPage.titleLength > 65) mobileScore -= 8;
+    mobileScore = Math.max(0, Math.min(100, Math.round(mobileScore)));
+
+    // -------------------------------------------------------------
+    // Desktop SEO Score (Max 100)
+    // -------------------------------------------------------------
+    let desktopScore = 100;
+    if (page.statusCode >= 400) desktopScore -= 40;
+    if (!page.technical.isHttps) desktopScore -= 15;
+    if (!page.technical.canonicalTag) desktopScore -= 10;
+    if (!page.onPage.title) desktopScore -= 25;
+    else if (page.onPage.titleLength < 30 || page.onPage.titleLength > 70) desktopScore -= 10;
+    if (page.onPage.h1Count !== 1) desktopScore -= 15;
+    if (page.content && page.content.wordCount < 300) desktopScore -= 15;
+    else if (page.content && page.content.wordCount < 600) desktopScore -= 8;
+    if (!page.structuredData || !page.structuredData.hasJsonLd) desktopScore -= 12;
+    if (page.responseTimeMs > 2500) desktopScore -= 15;
+    desktopScore = Math.max(0, Math.min(100, Math.round(desktopScore)));
+
+    // Enrich all issues with category, solutionSteps, suggestedFix, verificationSteps
+    const enrichedIssues = issues.map(iss => this._enrichIssue(iss));
+
     // Page overall score (same weights)
     const pageOverall = Math.round(
       (techScore * 0.25) +
@@ -649,6 +686,8 @@ class SeoScorer {
       url,
       pageOverall: Math.min(Math.max(pageOverall, 0), 100),
       scores: {
+        mobile: mobileScore,
+        desktop: desktopScore,
         technical: techScore,
         onPage: onPageScore,
         content: contentScore,
@@ -657,7 +696,118 @@ class SeoScorer {
         social: socialScore,
         local: localScore
       },
-      issues
+      issues: enrichedIssues
+    };
+  }
+
+  _enrichIssue(issue) {
+    const type = (issue.type || issue.issue_type || '').toLowerCase();
+    const title = (issue.title || '').toLowerCase();
+
+    let category = issue.category || 'technical';
+    let suggestedFix = issue.suggestedFix || issue.suggested_fix || null;
+    let solutionSteps = issue.solutionSteps || [];
+    let verificationSteps = issue.verificationSteps || [];
+
+    if (type.includes('viewport') || title.includes('viewport')) {
+      category = 'mobile';
+      suggestedFix = '<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />';
+      solutionSteps = [
+        'Open your layout or <head> template.',
+        'Add <meta name="viewport" content="width=device-width, initial-scale=1.0"> tag.',
+        'Ensure container elements do not have fixed widths greater than 100vw.'
+      ];
+      verificationSteps = ['Toggle DevTools mobile view to confirm responsive scaling.'];
+    } else if (type.includes('h1') || title.includes('h1')) {
+      category = 'onpage';
+      suggestedFix = '<h1>Premier Web Platform & Verified Services</h1>';
+      solutionSteps = [
+        'Identify the primary keyword and topic of the page.',
+        'Add exactly one <h1> element inside the header or hero section.',
+        'Replace any secondary H1 tags with <h2>.'
+      ];
+      verificationSteps = ['Run document.querySelectorAll("h1").length in console to verify count is 1.'];
+    } else if (type.includes('description') || title.includes('description')) {
+      category = 'onpage';
+      suggestedFix = '<meta name="description" content="Discover our verified digital platform. Learn how our automated tools and solutions drive measurable search performance." />';
+      solutionSteps = [
+        'Draft a 140-155 character summary matching search intent.',
+        'Add <meta name="description" content="..."> inside <head>.',
+        'Verify character length is between 120 and 160 characters.'
+      ];
+      verificationSteps = ['Check page source to verify <meta name="description"> tag is present.'];
+    } else if (type.includes('title') || title.includes('title')) {
+      category = 'onpage';
+      suggestedFix = '<title>Primary Keyword • Value Proposition | Brand Name</title>';
+      solutionSteps = [
+        'Write a 50-60 character title with your main keyword near the front.',
+        'Place <title> inside the <head> section.',
+        'Verify character length does not exceed 60 characters.'
+      ];
+      verificationSteps = ['Check browser tab and verify document.title.length <= 60.'];
+    } else if (type.includes('alt') || title.includes('alt')) {
+      category = 'content';
+      suggestedFix = '<img src="/assets/image.webp" alt="Descriptive context of graphic" loading="lazy" />';
+      solutionSteps = [
+        'Locate all <img> tags missing an alt attribute.',
+        'Add concise, descriptive alt text to each image.',
+        'Add loading="lazy" to images below the fold.'
+      ];
+      verificationSteps = ['Run document.querySelectorAll("img:not([alt])").length to confirm 0.'];
+    } else if (type.includes('schema') || title.includes('schema') || title.includes('json-ld')) {
+      category = 'schema';
+      suggestedFix = '<script type="application/ld+json">\n{\n  "@context": "https://schema.org",\n  "@type": "Organization",\n  "name": "My Enterprise",\n  "url": "https://example.com"\n}\n</script>';
+      solutionSteps = [
+        'Generate Schema.org Organization or WebSite JSON-LD.',
+        'Embed the script tag inside <head> or at the end of <body>.',
+        'Validate with Google Rich Results Test tool.'
+      ];
+      verificationSteps = ['Test URL in Google Rich Results Test to confirm valid structured data.'];
+    } else if (type.includes('canonical') || title.includes('canonical')) {
+      category = 'technical';
+      suggestedFix = `<link rel="canonical" href="${issue.page || 'https://example.com'}" />`;
+      solutionSteps = [
+        'Identify the authoritative canonical URL of this page.',
+        'Add <link rel="canonical" href="..."> to <head>.',
+        'Ensure self-referencing canonical points to https and correct slug.'
+      ];
+      verificationSteps = ['Verify canonical link tag exists in page source.'];
+    } else if (type.includes('https') || type.includes('ssl') || title.includes('insecure')) {
+      category = 'technical';
+      suggestedFix = 'server { listen 80; return 301 https://$host$request_uri; }';
+      solutionSteps = [
+        'Install or renew SSL/TLS certificate.',
+        'Configure server 301 permanent redirect from HTTP to HTTPS.',
+        'Update internal links to use https:// URLs.'
+      ];
+      verificationSteps = ['Run curl -I http://domain to confirm 301 redirect to https.'];
+    } else if (type.includes('response_time') || type.includes('perf') || type.includes('speed') || title.includes('response time')) {
+      category = 'performance';
+      suggestedFix = 'gzip on; gzip_types text/plain text/css application/json application/javascript;';
+      solutionSteps = [
+        'Enable server-side Gzip or Brotli compression.',
+        'Enable page and database query caching.',
+        'Route traffic through a global CDN like Cloudflare.'
+      ];
+      verificationSteps = ['Test server response time with DevTools Network tab.'];
+    } else if (type.includes('word_count') || type.includes('thin') || title.includes('thin')) {
+      category = 'content';
+      suggestedFix = '<!-- Expand content with high-value sections, FAQs, and topical guides -->';
+      solutionSteps = [
+        'Identify target search queries and intent for this page.',
+        'Expand copy to at least 500-800 words of original, comprehensive content.',
+        'Organize with clear <h2> subheadings and bullet lists.'
+      ];
+      verificationSteps = ['Count total words to ensure >= 500 words.'];
+    }
+
+    return {
+      ...issue,
+      category,
+      suggestedFix,
+      suggested_fix: suggestedFix,
+      solutionSteps,
+      verificationSteps
     };
   }
 }

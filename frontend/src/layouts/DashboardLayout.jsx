@@ -35,7 +35,7 @@ export default function DashboardLayout() {
             </span>
             <h2 className="text-2xl font-black text-white">Create Account to Continue</h2>
             <p className="text-xs text-slate-300 leading-relaxed">
-              Please create an account or sign in to access your website audits, Master AI Solution Prompts, and SEO optimization tools.
+              Please create an account or sign in to access your website audits, Mobile & Desktop scores, and direct website code solutions.
             </p>
           </div>
 

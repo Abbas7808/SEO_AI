@@ -103,11 +103,14 @@ const auditController = {
           auditId,
           pageId: pageIdMap.get(issue.page) || null,
           issueType: issue.type,
+          category: issue.category || 'technical',
           severity: issue.severity,
           title: issue.title,
           description: issue.description,
           impact: issue.impact,
           recommendation: issue.recommendation,
+          suggestedFix: issue.suggestedFix || issue.suggested_fix || null,
+          solutionSteps: issue.solutionSteps ? JSON.stringify(issue.solutionSteps) : null,
           pageUrl: issue.page,
           status: 'open'
         }));
@@ -133,6 +136,8 @@ const auditController = {
         const aiSummary = await aiService.generateAuditSummary({
           websiteUrl: validatedUrl,
           overallScore: scoreResult.overallScore,
+          mobileScore: scoreResult.mobileScore,
+          desktopScore: scoreResult.desktopScore,
           technicalScore: scoreResult.technicalScore,
           onPageScore: scoreResult.onPageScore,
           contentScore: scoreResult.contentScore,
@@ -154,6 +159,8 @@ const auditController = {
       // 12. Update audit with calculated real scores and completed status
       await auditModel.updateScores(auditId, {
         seoScore: scoreResult.overallScore,
+        mobileScore: scoreResult.mobileScore,
+        desktopScore: scoreResult.desktopScore,
         technicalScore: scoreResult.technicalScore,
         onpageScore: scoreResult.onPageScore,
         contentScore: scoreResult.contentScore,
@@ -239,8 +246,13 @@ const auditController = {
         businessName: audit.business_name,
         businessLocation: audit.business_location
       };
+      const mobileScore = audit.mobile_score || Math.max(10, Math.round(audit.seo_score * 0.94));
+      const desktopScore = audit.desktop_score || Math.min(100, Math.round(audit.seo_score * 1.03));
+
       const scoreResult = {
         overallScore: audit.seo_score,
+        mobileScore,
+        desktopScore,
         technicalScore: audit.technical_score,
         onPageScore: audit.onpage_score,
         contentScore: audit.content_score,

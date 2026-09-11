@@ -18,7 +18,7 @@ export default function Footer() {
               </span>
             </Link>
             <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
-              Autonomous SEO audit & optimization platform powered by real website crawling, technical analysis, and intelligent Master AI solution prompts.
+              Autonomous SEO audit & optimization platform powered by real website crawling, technical analysis, and instant production-ready code solutions.
             </p>
           </div>
 
@@ -44,7 +44,7 @@ export default function Footer() {
             <ul className="space-y-2.5 text-sm text-slate-600 dark:text-slate-400">
               <li><Link to="/dashboard/optimizer" className="hover:text-brand-600 dark:hover:text-brand-400">Content Optimizer</Link></li>
               <li><Link to="/dashboard/consultant" className="hover:text-brand-600 dark:hover:text-brand-400">AI SEO Consultant</Link></li>
-              <li><Link to="/dashboard/issues" className="hover:text-brand-600 dark:hover:text-brand-400">Master AI Prompt Studio</Link></li>
+              <li><Link to="/dashboard/issues" className="hover:text-brand-600 dark:hover:text-brand-400">Issues & Direct Code Solutions</Link></li>
               <li><Link to="/dashboard/reports" className="hover:text-brand-600 dark:hover:text-brand-400">PDF Report Generator</Link></li>
             </ul>
           </div>

@@ -31,7 +31,7 @@ export default function Sidebar({ mobileOpen, setMobileOpen }) {
     { to: '/dashboard/roadmap', label: 'SEO Roadmap', icon: Milestone, badge: 'New' },
     { to: '/dashboard/antigravity', label: 'Antigravity Auto-Fixer', icon: Cpu, badge: 'Agent' },
     { to: '/dashboard/backlit-words', label: 'Backlit Words & Links', icon: Sparkles, badge: 'AI' },
-    { to: '/dashboard/issues', label: 'SEO Issues', icon: AlertTriangle },
+    { to: '/dashboard/issues', label: 'Issues & Code Fixes', icon: AlertTriangle },
     { to: '/dashboard/pages', label: 'Page Analysis', icon: Layers },
     { to: '/dashboard/inspector', label: 'Site Inspector', icon: FileSearch },
     { to: '/dashboard/compare', label: 'Competitor Compare', icon: GitCompare },

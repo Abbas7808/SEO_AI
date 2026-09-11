@@ -47,6 +47,8 @@ const auditModel = {
   async updateScores(id, scores) {
     const {
       seoScore = 0,
+      mobileScore = 0,
+      desktopScore = 0,
       technicalScore = 0,
       onpageScore = 0,
       contentScore = 0,
@@ -61,6 +63,8 @@ const auditModel = {
     await db.query(
       `UPDATE audits SET 
          seo_score = ?, 
+         mobile_score = ?,
+         desktop_score = ?,
          technical_score = ?, 
          onpage_score = ?, 
          content_score = ?, 
@@ -74,6 +78,8 @@ const auditModel = {
        WHERE id = ?`,
       [
         seoScore,
+        mobileScore,
+        desktopScore,
         technicalScore,
         onpageScore,
         contentScore,
