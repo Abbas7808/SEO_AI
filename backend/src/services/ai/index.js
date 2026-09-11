@@ -490,17 +490,20 @@ Rules:
     const wordCount = words.length;
     const kw = (targetKeyword || '').trim().toLowerCase();
 
-    // Word frequency map (excluding common stop words)
+    // Word frequency map (excluding common stop words and filler terms)
     const stopWords = new Set([
       'the', 'and', 'for', 'that', 'this', 'with', 'from', 'have', 'are', 'was', 'were',
       'your', 'will', 'all', 'can', 'has', 'our', 'more', 'about', 'when', 'which', 'what',
-      'into', 'some', 'than', 'them', 'then', 'these', 'there', 'been', 'would', 'other'
+      'into', 'some', 'than', 'them', 'then', 'these', 'there', 'been', 'would', 'other',
+      'you', 'they', 'their', 'each', 'also', 'such', 'only', 'just', 'how', 'its', 'not',
+      'but', 'out', 'any', 'most', 'over', 'after', 'well', 'here', 'now', 'very', 'even'
     ]);
 
     const freqMap = new Map();
     words.forEach(rawW => {
       const clean = rawW.toLowerCase().replace(/[^a-z0-9]/g, '');
-      if (clean.length > 2 && !stopWords.has(clean)) {
+      // Filter out pure numbers, short tokens, or filler stop words
+      if (clean.length > 2 && !/^\d+$/.test(clean) && !stopWords.has(clean)) {
         freqMap.set(clean, (freqMap.get(clean) || 0) + 1);
       }
     });

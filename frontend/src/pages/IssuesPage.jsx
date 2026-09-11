@@ -40,6 +40,7 @@ export default function IssuesPage() {
 
   const [issues, setIssues] = useState([]);
   const [currentAudit, setCurrentAudit] = useState(null);
+  const [auditPages, setAuditPages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeSeverityFilter, setActiveSeverityFilter] = useState('all');
   const [activeCategoryFilter, setActiveCategoryFilter] = useState('all');
@@ -173,6 +174,9 @@ export default function IssuesPage() {
           if (auditRes?.data?.audit) {
             loadedAudit = auditRes.data.audit;
             setCurrentAudit(loadedAudit);
+            if (auditRes?.data?.pages) {
+              setAuditPages(auditRes.data.pages);
+            }
           }
           if (issuesRes?.data?.issues && issuesRes.data.issues.length > 0) {
             setIssues(issuesRes.data.issues);
@@ -252,6 +256,15 @@ export default function IssuesPage() {
     setCodeFrameworkMap(prev => ({ ...prev, [issueId]: fw }));
   };
 
+  const renderSeverityBadge = (severity) => {
+    const badge = getSeverityBadge(severity);
+    return (
+      <span className={`px-2 py-0.5 rounded-md text-[11px] font-bold border ${badge.bg}`}>
+        {badge.text}
+      </span>
+    );
+  };
+
   // Filter and search
   const filteredIssues = issues.filter((issue) => {
     const solution = getIssueSolution(issue, currentAudit?.website_url);
@@ -291,7 +304,12 @@ export default function IssuesPage() {
       <DualScoreHero audit={currentAudit} scoreResult={currentAudit} />
 
       {/* 2. HOW TO IMPROVE YOUR SEO SKILLS SECTION */}
-      <SeoSkillsGuide audit={currentAudit} scoreResult={currentAudit} />
+      <SeoSkillsGuide 
+        audit={currentAudit} 
+        scoreResult={currentAudit} 
+        pages={auditPages}
+        issues={issues}
+      />
 
       {/* 3. WEBSITE ISSUES & RESOLUTION CENTER */}
       <div className="space-y-6">
@@ -448,7 +466,7 @@ export default function IssuesPage() {
 
                       <div className="min-w-0 space-y-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          {getSeverityBadge(issue.severity)}
+                          {renderSeverityBadge(issue.severity)}
                           <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/60">
                             {solution.category}
                           </span>

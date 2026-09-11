@@ -537,11 +537,42 @@ const auditController = {
 
   async analyzeBacklitWords(req, res, next) {
     try {
-      const { content, targetKeyword, url } = req.body;
+      const { content, targetKeyword, url, auditId } = req.body;
       let textToAnalyze = content || '';
+      let targetUrl = url || '';
+      let activeKeyword = (targetKeyword || '').trim();
 
-      if (!textToAnalyze && url) {
-        const validatedUrl = await validateAuditUrl(url);
+      // If auditId is provided, extract cached audit data and pages
+      if (auditId && (!textToAnalyze || !targetUrl)) {
+        const audit = await auditModel.findById(auditId);
+        if (audit) {
+          if (!targetUrl) targetUrl = audit.website_url;
+          if (!activeKeyword && audit.target_keyword) activeKeyword = audit.target_keyword;
+
+          const pages = await pageModel.findByAudit(auditId);
+          if (pages && pages.length > 0 && !textToAnalyze) {
+            const snippets = pages.map(p => {
+              let s = `${p.title || ''} ${p.meta_description || ''}`;
+              if (p.content_details) {
+                try {
+                  const cd = typeof p.content_details === 'string' ? JSON.parse(p.content_details) : p.content_details;
+                  if (cd.headings) {
+                    if (cd.headings.h1) s += ' ' + cd.headings.h1.join(' ');
+                    if (cd.headings.h2) s += ' ' + cd.headings.h2.join(' ');
+                  }
+                } catch (e) {}
+              }
+              return s;
+            }).join(' ');
+            if (snippets.trim().length > 60) {
+              textToAnalyze = snippets;
+            }
+          }
+        }
+      }
+
+      if (!textToAnalyze && targetUrl) {
+        const validatedUrl = await validateAuditUrl(targetUrl);
         const crawler = new CrawlerService({ maxPages: 1, timeout: 8000 });
         const crawlRes = await crawler.crawl(validatedUrl);
         if (crawlRes.pages && crawlRes.pages[0] && crawlRes.pages[0].html) {
@@ -558,8 +589,8 @@ const auditController = {
 
       const result = await aiService.analyzeBacklitWords({
         content: textToAnalyze,
-        targetKeyword: targetKeyword || '',
-        url: url || ''
+        targetKeyword: activeKeyword,
+        url: targetUrl
       });
 
       res.json({

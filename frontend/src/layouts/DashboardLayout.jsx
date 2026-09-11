@@ -3,6 +3,7 @@ import { Outlet, useNavigate } from 'react-router-dom';
 import { Lock, Sparkles, ArrowRight, UserPlus, LogIn, ExternalLink } from 'lucide-react';
 import Sidebar from '../components/dashboard/Sidebar';
 import Topbar from '../components/dashboard/Topbar';
+import ErrorBoundary from '../components/common/ErrorBoundary';
 import { useAuth } from '../hooks/useAuth';
 
 export default function DashboardLayout() {
@@ -56,6 +57,19 @@ export default function DashboardLayout() {
               <LogIn className="w-4 h-4" />
               <span>Sign In to Existing Account</span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                localStorage.setItem('seo_token', 'guest_demo_token_' + Date.now());
+                localStorage.setItem('seo_user', JSON.stringify({ name: 'Guest Specialist', email: 'guest@seoauditor.com' }));
+                window.location.reload();
+              }}
+              className="w-full py-2.5 px-4 rounded-xl font-semibold text-xs text-indigo-400 hover:text-indigo-300 hover:bg-indigo-950/30 transition-all flex items-center justify-center gap-1.5 border border-indigo-900/50"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Continue in Instant Demo Mode</span>
+            </button>
           </div>
         </div>
       </div>
@@ -68,7 +82,9 @@ export default function DashboardLayout() {
       <div className="md:pl-64 flex flex-col min-h-screen">
         <Topbar setMobileOpen={setMobileOpen} />
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
-          <Outlet />
+          <ErrorBoundary>
+            <Outlet />
+          </ErrorBoundary>
         </main>
         {/* Dashboard Footer with Developer Attribution */}
         <footer className="border-t border-slate-200 dark:border-slate-800/80 bg-white/50 dark:bg-slate-900/50 py-4 px-6 text-xs text-slate-500 dark:text-slate-400 flex flex-col sm:flex-row items-center justify-between gap-3">

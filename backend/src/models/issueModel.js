@@ -9,7 +9,7 @@ const issueModel = {
     const placeholders = [];
 
     for (const issue of issues) {
-      placeholders.push('(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+      placeholders.push('(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
       values.push(
         issue.auditId,
         issue.pageId || null,
