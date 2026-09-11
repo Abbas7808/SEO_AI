@@ -141,18 +141,32 @@ class CrawlerService {
         const elapsed = Date.now() - startTime;
         pageResult.statusCode = response.status;
         pageResult.responseTimeMs = elapsed;
+        pageResult.ttfbMs = elapsed;
         pageResult.headers = response.headers || {};
+        pageResult.protocol = currentUrl.startsWith('https:') ? 'https' : 'http';
+        pageResult.server = response.headers['server'] || null;
+        pageResult.contentEncoding = response.headers['content-encoding'] || null;
         
         const contentType = response.headers['content-type'] || '';
         if (typeof response.data === 'string' && contentType.includes('text/html')) {
           pageResult.html = response.data;
           pageResult.htmlSize = Buffer.byteLength(response.data, 'utf8');
 
-          // Parse links with Cheerio
+          // Parse links & resource tags with Cheerio
           const $ = cheerio.load(response.data);
           const pageInternal = new Set();
           const pageExternal = new Set();
           const linksDetail = [];
+
+          // Resource metrics for Performance & Asset Budget
+          pageResult.resourceCounts = {
+            scripts: $('script[src]').length,
+            inlineScripts: $('script:not([src])').length,
+            stylesheets: $('link[rel="stylesheet"]').length,
+            images: $('img').length,
+            iframes: $('iframe').length,
+            fonts: $('link[rel*="font"], link[href*="fonts."]').length
+          };
 
           $('a[href]').each((_, el) => {
             const rawHref = $(el).attr('href');
@@ -192,6 +206,7 @@ class CrawlerService {
           pageResult.linksDetail = linksDetail;
         } else {
           pageResult.htmlSize = typeof response.data === 'string' ? Buffer.byteLength(response.data, 'utf8') : 0;
+          pageResult.resourceCounts = { scripts: 0, inlineScripts: 0, stylesheets: 0, images: 0, iframes: 0, fonts: 0 };
         }
 
       } catch (reqErr) {

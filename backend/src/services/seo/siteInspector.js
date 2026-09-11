@@ -140,12 +140,28 @@ class SiteInspector {
       sitemapResult.issues.push(`Failed to fetch sitemap: ${err.message}`);
     }
 
+    // 3. Deep Page Intelligence (Performance, Security Headers, Tech Stack, SERP Simulator)
+    let pageIntelligence = null;
+    try {
+      const CrawlerService = require('../crawler');
+      const PageAnalyzer = require('./analyzer');
+      const crawler = new CrawlerService({ maxPages: 1, timeout: 8000 });
+      const crawlRes = await crawler.crawl(validatedUrl);
+      if (crawlRes.pages && crawlRes.pages[0]) {
+        const analyzer = new PageAnalyzer(crawlRes.pages[0], { websiteUrl: validatedUrl });
+        pageIntelligence = analyzer.analyze();
+      }
+    } catch (intelErr) {
+      logger.warn(`SiteInspector page intelligence note: ${intelErr.message}`);
+    }
+
     return {
       domain: parsed.host,
       origin,
       inspectedAt: new Date().toISOString(),
       robots: robotsResult,
-      sitemap: sitemapResult
+      sitemap: sitemapResult,
+      pageIntelligence
     };
   }
 }

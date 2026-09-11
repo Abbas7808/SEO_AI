@@ -33,6 +33,7 @@ import { getSeverityBadge } from '../utils/formatters';
 import { getIssueSolution } from '../utils/issueSolutions';
 import DualScoreHero from '../components/common/DualScoreHero';
 import SeoSkillsGuide from '../components/common/SeoSkillsGuide';
+import AdvancedSiteIntelligence from '../components/common/AdvancedSiteIntelligence';
 
 export default function IssuesPage() {
   const [searchParams] = useSearchParams();
@@ -41,6 +42,7 @@ export default function IssuesPage() {
   const [issues, setIssues] = useState([]);
   const [currentAudit, setCurrentAudit] = useState(null);
   const [auditPages, setAuditPages] = useState([]);
+  const [siteIntelligence, setSiteIntelligence] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeSeverityFilter, setActiveSeverityFilter] = useState('all');
   const [activeCategoryFilter, setActiveCategoryFilter] = useState('all');
@@ -177,6 +179,9 @@ export default function IssuesPage() {
             if (auditRes?.data?.pages) {
               setAuditPages(auditRes.data.pages);
             }
+            if (auditRes?.data?.siteIntelligence) {
+              setSiteIntelligence(auditRes.data.siteIntelligence);
+            }
           }
           if (issuesRes?.data?.issues && issuesRes.data.issues.length > 0) {
             setIssues(issuesRes.data.issues);
@@ -303,7 +308,14 @@ export default function IssuesPage() {
       {/* 1. DUAL SCORE HERO DISPLAY (Mobile SEO & Desktop SEO Score) */}
       <DualScoreHero audit={currentAudit} scoreResult={currentAudit} />
 
-      {/* 2. HOW TO IMPROVE YOUR SEO SKILLS SECTION */}
+      {/* 2. ADVANCED SITE INTELLIGENCE SUITE */}
+      <AdvancedSiteIntelligence 
+        siteIntelligence={siteIntelligence || (auditPages[0]?.content_details)}
+        audit={currentAudit}
+        page={auditPages[0]}
+      />
+
+      {/* 3. HOW TO IMPROVE YOUR SEO SKILLS SECTION */}
       <SeoSkillsGuide 
         audit={currentAudit} 
         scoreResult={currentAudit} 
