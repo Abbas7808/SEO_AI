@@ -25,6 +25,8 @@ const AIConsultantPage = lazy(() => import('./pages/AIConsultantPage'));
 const ContentOptimizerPage = lazy(() => import('./pages/ContentOptimizerPage'));
 const AuditHistoryPage = lazy(() => import('./pages/AuditHistoryPage'));
 const ReportsPage = lazy(() => import('./pages/ReportsPage'));
+const UpgradePage = lazy(() => import('./pages/UpgradePage'));
+const AdminBillingPage = lazy(() => import('./pages/AdminBillingPage'));
 
 export default function App() {
   // Prune old storage garbage on initial mount
@@ -61,6 +63,8 @@ export default function App() {
             <Route path="optimizer" element={<ContentOptimizerPage />} />
             <Route path="history" element={<AuditHistoryPage />} />
             <Route path="reports" element={<ReportsPage />} />
+            <Route path="billing" element={<UpgradePage />} />
+            <Route path="admin-billing" element={<AdminBillingPage />} />
           </Route>
 
           {/* Catch-all redirect */}

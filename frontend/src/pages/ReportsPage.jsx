@@ -8,16 +8,24 @@ import {
   Globe,
   ShieldCheck,
   Calendar,
-  AlertTriangle
+  AlertTriangle,
+  Lock,
+  Crown
 } from 'lucide-react';
 import ScoreBadge from '../components/common/ScoreBadge';
 
 import { useSearchParams } from 'react-router-dom';
 import { auditApi, reportsApi } from '../services/api';
+import { getUserPlan } from '../utils/planLimits';
+import TrialLimitModal from '../components/common/TrialLimitModal';
 
 export default function ReportsPage() {
   const [searchParams] = useSearchParams();
   const auditId = searchParams.get('auditId');
+
+  const userPlan = getUserPlan();
+  const isPro = userPlan === 'pro' || userPlan === 'agency';
+  const [showLimitModal, setShowLimitModal] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [liveAudit, setLiveAudit] = useState(null);
@@ -78,6 +86,10 @@ export default function ReportsPage() {
   ];
 
   const handleDownloadPdf = () => {
+    if (!isPro) {
+      setShowLimitModal(true);
+      return;
+    }
     if (audit?.id) {
       window.open(reportsApi.getPdfDownloadUrl(audit.id), '_blank');
     } else {
@@ -105,10 +117,23 @@ export default function ReportsPage() {
         <div className="flex items-center gap-3">
           <button
             onClick={handleDownloadPdf}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs bg-brand-600 hover:bg-brand-700 text-white shadow-md shadow-brand-500/20 transition-all"
+            className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all shadow-sm ${
+              isPro
+                ? 'bg-brand-600 hover:bg-brand-700 text-white shadow-brand-500/20'
+                : 'bg-amber-100 hover:bg-amber-200 text-amber-900 dark:bg-amber-950/60 dark:text-amber-200 border border-amber-300 dark:border-amber-700'
+            }`}
           >
-            <Download className="w-4 h-4" />
+            {isPro ? (
+              <Download className="w-4 h-4" />
+            ) : (
+              <Lock className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+            )}
             <span>Download Official PDF</span>
+            {!isPro && (
+              <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold uppercase bg-amber-200 dark:bg-amber-800 text-amber-900 dark:text-amber-100 ml-1">
+                Pro
+              </span>
+            )}
           </button>
           <button
             onClick={handlePrint}
@@ -222,6 +247,12 @@ export default function ReportsPage() {
           <span>100% Verified Live Crawler Diagnostics</span>
         </div>
       </div>
+
+      <TrialLimitModal
+        isOpen={showLimitModal}
+        onClose={() => setShowLimitModal(false)}
+        triggerReason="pro_feature"
+      />
     </div>
   );
 }

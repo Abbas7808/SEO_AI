@@ -17,15 +17,23 @@ import {
   ExternalLink,
   ChevronRight,
   Flame,
-  Code2
+  Code2,
+  Lock,
+  Crown
 } from 'lucide-react';
 import { auditApi, antigravityApi } from '../services/api';
 import { getSeverityBadge } from '../utils/formatters';
+import { getUserPlan } from '../utils/planLimits';
+import TrialLimitModal from '../components/common/TrialLimitModal';
 
 export default function AntigravityFixerPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const auditId = searchParams.get('auditId');
+
+  const userPlan = getUserPlan();
+  const isPro = userPlan === 'pro' || userPlan === 'agency';
+  const [showLimitModal, setShowLimitModal] = useState(false);
 
   const [audits, setAudits] = useState([]);
   const [currentAudit, setCurrentAudit] = useState(null);
@@ -330,15 +338,29 @@ export default function AntigravityFixerPage() {
             </button>
 
             {selectedAuditId && (
-              <a
-                href={antigravityApi.getPatchDownloadUrl(selectedAuditId, activeFramework)}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
-              >
-                <Download className="h-4 w-4 text-gray-600" />
-                Download Patch Sheet
-              </a>
+              isPro ? (
+                <a
+                  href={antigravityApi.getPatchDownloadUrl(selectedAuditId, activeFramework)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
+                >
+                  <Download className="h-4 w-4 text-gray-600" />
+                  Download Patch Sheet
+                </a>
+              ) : (
+                <button
+                  onClick={() => setShowLimitModal(true)}
+                  className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium text-amber-800 bg-amber-100 hover:bg-amber-200 transition-colors"
+                  title="Unlock 1-Click Patches with Pro Specialist"
+                >
+                  <Lock className="h-4 w-4 text-amber-600" />
+                  <span>Download Patch Sheet</span>
+                  <span className="text-[10px] font-bold uppercase px-1.5 py-0.2 rounded bg-amber-200 text-amber-900">
+                    Pro
+                  </span>
+                </button>
+              )
             )}
           </div>
         </div>
@@ -521,6 +543,13 @@ export default function AntigravityFixerPage() {
           </div>
         )}
       </div>
+
+      {/* Pro Paywall Modal */}
+      <TrialLimitModal
+        isOpen={showLimitModal}
+        onClose={() => setShowLimitModal(false)}
+        triggerReason="pro_feature"
+      />
     </div>
   );
 }

@@ -17,17 +17,27 @@ import {
   Milestone,
   FileSearch,
   GitCompare,
-  Cpu
+  Cpu,
+  Crown,
+  ShieldCheck,
+  CreditCard
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { getUserPlan, getTrialUsage } from '../../utils/planLimits';
 
 export default function Sidebar({ mobileOpen, setMobileOpen }) {
   const { logout, user } = useAuth();
   const navigate = useNavigate();
 
+  const userPlan = getUserPlan(user?.email);
+  const trialUsage = getTrialUsage(user?.email);
+  const isPro = userPlan === 'pro' || userPlan === 'agency';
+
   const navItems = [
     { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true },
     { to: '/dashboard/new', label: 'Start Audit', icon: Search },
+    { to: '/dashboard/billing', label: 'Billing & Upgrade', icon: Crown, badge: isPro ? 'Pro' : `${trialUsage.auditsRemaining} Left` },
+    { to: '/dashboard/admin-billing', label: 'Admin Approvals', icon: ShieldCheck },
     { to: '/dashboard/roadmap', label: 'SEO Roadmap', icon: Milestone, badge: 'New' },
     { to: '/dashboard/antigravity', label: 'Antigravity Auto-Fixer', icon: Cpu, badge: 'Agent' },
     { to: '/dashboard/backlit-words', label: 'Backlit Words & Links', icon: Sparkles, badge: 'AI' },
@@ -106,6 +116,51 @@ export default function Sidebar({ mobileOpen, setMobileOpen }) {
             </NavLink>
           );
         })}
+
+        {/* Trial Usage or Pro Badge */}
+        {!isPro ? (
+          <div className="mx-2 my-2 p-3 rounded-2xl bg-gradient-to-br from-amber-500/10 to-brand-500/10 border border-amber-300/40 dark:border-amber-700/40 space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-extrabold text-amber-700 dark:text-amber-300 flex items-center gap-1 text-[11px]">
+                <Sparkles className="w-3 h-3 text-amber-500" />
+                Free Demo
+              </span>
+              <span className="text-[10px] font-mono font-bold text-slate-500 dark:text-slate-400">
+                {trialUsage.auditsCount} / 3 Trials
+              </span>
+            </div>
+            <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5 overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${
+                  trialUsage.isLimitReached ? 'bg-rose-500' : 'bg-amber-500'
+                }`}
+                style={{ width: `${trialUsage.percentageUsed}%` }}
+              />
+            </div>
+            <NavLink
+              to="/dashboard/billing"
+              onClick={() => setMobileOpen && setMobileOpen(false)}
+              className="w-full py-1.5 px-2 rounded-xl text-center font-bold text-[11px] text-white bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-700 hover:to-indigo-700 transition-colors flex items-center justify-center gap-1 shadow-xs"
+            >
+              <span>Upgrade to Pro</span>
+              <ChevronRight className="w-3 h-3" />
+            </NavLink>
+          </div>
+        ) : (
+          <div className="mx-2 my-2 p-2.5 rounded-2xl bg-brand-50/80 dark:bg-brand-950/40 border border-brand-200 dark:border-brand-800 flex items-center gap-2 text-xs">
+            <div className="w-7 h-7 rounded-xl bg-amber-400 text-amber-950 flex items-center justify-center shadow-xs">
+              <Crown className="w-4 h-4" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <span className="font-extrabold text-brand-700 dark:text-brand-300 block text-[11px] uppercase tracking-wider">
+                {userPlan.toUpperCase()} Member
+              </span>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 block truncate">
+                Unlimited Project Audits
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* User Footer / Logout */}
