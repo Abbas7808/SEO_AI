@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import MainLayout from './layouts/MainLayout';
 import DashboardLayout from './layouts/DashboardLayout';
 import PageLoadingFallback from './components/common/PageLoadingFallback';
@@ -29,10 +29,21 @@ const UpgradePage = lazy(() => import('./pages/UpgradePage'));
 const AdminBillingPage = lazy(() => import('./pages/AdminBillingPage'));
 
 export default function App() {
-  // Prune old storage garbage on initial mount
+  const navigate = useNavigate();
+
+  // Prune old storage garbage on initial mount & register Ctrl+Shift+A shortcut for Admin
   useEffect(() => {
     autoPruneStaleCache();
-  }, []);
+
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'a' || e.key === 'A')) {
+        e.preventDefault();
+        navigate('/dashboard/admin-billing');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [navigate]);
 
   return (
     <>
@@ -41,6 +52,9 @@ export default function App() {
 
       <Suspense fallback={<PageLoadingFallback />}>
         <Routes>
+          {/* Quick-Access Admin Short Route */}
+          <Route path="/admin" element={<Navigate to="/dashboard/admin-billing" replace />} />
+
           {/* Public Marketing & Auth Views */}
           <Route path="/" element={<MainLayout />}>
             <Route index element={<LandingPage />} />

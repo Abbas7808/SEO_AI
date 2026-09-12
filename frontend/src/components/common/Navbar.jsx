@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, Sparkles, Sun, Moon, Menu, X, ArrowRight, LayoutDashboard, Zap } from 'lucide-react';
+import { Search, Sparkles, Sun, Moon, Menu, X, ArrowRight, LayoutDashboard, Zap, ShieldCheck } from 'lucide-react';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../hooks/useAuth';
 import TurboBoostModal from './TurboBoostModal';
@@ -45,7 +45,17 @@ export default function Navbar() {
           </nav>
 
           {/* Desktop Right Side */}
-          <div className="hidden md:flex items-center gap-3">
+          <div className="hidden md:flex items-center gap-2.5">
+            {/* Quick Admin Portal link */}
+            <Link
+              to="/admin"
+              title="Owner Admin Member Approvals"
+              className="text-xs font-bold px-3 py-1.5 rounded-xl text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800 transition-colors flex items-center gap-1.5 shadow-xs"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+              <span>Admin</span>
+            </Link>
+
             {/* Turbo Boost & Cache Button */}
             <button
               onClick={() => setTurboOpen(true)}
@@ -94,11 +104,17 @@ export default function Navbar() {
 
           {/* Mobile Menu Button */}
           <div className="flex md:hidden items-center gap-2">
+            <Link
+              to="/admin"
+              className="text-xs font-bold px-2.5 py-1 rounded-lg text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800"
+            >
+              Admin
+            </Link>
             <button
               onClick={toggleTheme}
               className="p-2 rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
             >
-              {isDark ? <Sun className="w-5 h-5 text-amber-400" /> : <Moon className="w-5 h-5" />}
+              {isDark ? <Sun className="w-5 h-5 text-amber-400" /> : <Moon className="w-5 h-5 text-slate-600" />}
             </button>
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -113,6 +129,14 @@ export default function Navbar() {
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
         <div className="md:hidden border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 pt-2 pb-6 space-y-3">
+          <Link
+            to="/admin"
+            onClick={() => setMobileMenuOpen(false)}
+            className="flex items-center gap-2 py-2 text-base font-bold text-indigo-600 dark:text-indigo-400"
+          >
+            <ShieldCheck className="w-4 h-4" />
+            <span>Admin Approvals (Owner Portal)</span>
+          </Link>
           <Link
             to="/"
             onClick={() => setMobileMenuOpen(false)}

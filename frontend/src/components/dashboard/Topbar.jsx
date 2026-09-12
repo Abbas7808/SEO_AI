@@ -50,6 +50,19 @@ export default function Topbar({ setMobileOpen, activeWebsite = null }) {
             <span className="hidden sm:inline">Turbo Boost</span>
           </button>
 
+          {/* Quick Admin Access Button */}
+          <button
+            onClick={() => navigate('/dashboard/admin-billing')}
+            title="Owner Admin Approvals (Shortcut: Ctrl+Shift+A)"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800 transition-all hover:scale-105 active:scale-95"
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+            <span className="hidden sm:inline">Admin</span>
+            <span className="px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-indigo-200 dark:bg-indigo-800 text-indigo-900 dark:text-indigo-100">
+              Owner
+            </span>
+          </button>
+
           {/* Quick Start Audit Button */}
           <button
             onClick={() => navigate('/dashboard/new')}

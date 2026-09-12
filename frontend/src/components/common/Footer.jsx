@@ -81,6 +81,12 @@ export default function Footer() {
           </div>
 
           <div className="flex items-center gap-4">
+            <Link
+              to="/admin"
+              className="text-slate-500 hover:text-brand-600 dark:hover:text-brand-400 font-bold transition-colors"
+            >
+              Admin Portal
+            </Link>
             <a
               href="https://www.linkedin.com/in/munim-abbas"
               target="_blank"
