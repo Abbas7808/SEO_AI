@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, Sparkles, Sun, Moon, Menu, X, ArrowRight, LayoutDashboard } from 'lucide-react';
+import { Search, Sparkles, Sun, Moon, Menu, X, ArrowRight, LayoutDashboard, Zap } from 'lucide-react';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../hooks/useAuth';
+import TurboBoostModal from './TurboBoostModal';
 
 export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [turboOpen, setTurboOpen] = useState(false);
   const { isDark, toggleTheme } = useTheme();
   const { isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
@@ -44,6 +46,16 @@ export default function Navbar() {
 
           {/* Desktop Right Side */}
           <div className="hidden md:flex items-center gap-3">
+            {/* Turbo Boost & Cache Button */}
+            <button
+              onClick={() => setTurboOpen(true)}
+              title="Clean cache & boost speed"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-amber-900 dark:text-amber-200 bg-amber-400/15 hover:bg-amber-400/25 border border-amber-500/30 transition-all hover:scale-105 active:scale-95"
+            >
+              <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+              <span>Turbo Boost</span>
+            </button>
+
             {/* Theme Toggle */}
             <button
               onClick={toggleTheme}
@@ -149,11 +161,24 @@ export default function Navbar() {
                 >
                   Get Started Free
                 </Link>
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    setTurboOpen(true);
+                  }}
+                  className="w-full py-2 px-3 text-xs font-bold text-amber-900 dark:text-amber-200 bg-amber-400/20 rounded-lg flex items-center justify-center gap-1.5"
+                >
+                  <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                  <span>Turbo Boost & Clear Cache</span>
+                </button>
               </>
             )}
           </div>
         </div>
       )}
+
+      {/* Turbo Boost Modal */}
+      <TurboBoostModal isOpen={turboOpen} onClose={() => setTurboOpen(false)} />
     </header>
   );
 }

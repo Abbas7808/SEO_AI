@@ -5,10 +5,16 @@ const logger = require('./src/utils/logger');
 
 async function startServer() {
   try {
-    // 1. Initialize MySQL Database & Run Schema
+    // 1. Initialize MySQL Database & Run Schema (Resilient Boot)
     logger.info('Initializing AI SEO Auditor database connection...');
-    await db.initDatabase();
-    logger.info('Database initialized successfully.');
+    try {
+      await db.initDatabase();
+      logger.info('Database initialized successfully.');
+    } catch (dbErr) {
+      logger.warn(`⚠️ MySQL Database is not reachable (${dbErr.message}).`);
+      logger.warn('Backend server will operate in Resilient Standalone Mode.');
+      logger.warn('To persist audits to MySQL, ensure MySQL is running (e.g. via XAMPP) on port 3306.');
+    }
 
     // 2. Start HTTP Server
     const PORT = config.port;
@@ -28,10 +34,12 @@ async function startServer() {
         logger.info('HTTP server closed.');
         try {
           const pool = db.getPool();
-          await pool.end();
-          logger.info('Database pool closed.');
+          if (pool) {
+            await pool.end();
+            logger.info('Database pool closed.');
+          }
         } catch (e) {
-          logger.error('Error closing DB pool:', e.message);
+          // DB pool wasn't initialized, no teardown needed
         }
         process.exit(0);
       });

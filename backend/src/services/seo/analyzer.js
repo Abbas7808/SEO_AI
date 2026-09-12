@@ -271,6 +271,8 @@ class PageAnalyzer {
     const searchIntent = this._evaluateSearchIntent(rawText, title, h1s);
 
     // 14. Live SERP & Social Preview Simulator
+    const pathSegments = parsedUrl.pathname.split('/').filter(Boolean).map(p => decodeURIComponent(p));
+    const breadcrumbDisplay = pathSegments.length > 0 ? pathSegments.join(' › ') : '';
     const serpSimulator = {
       desktop: {
         title: title || 'Untitled Page',
@@ -280,12 +282,18 @@ class PageAnalyzer {
         metaDescription: metaDescription || 'No description provided.',
         descriptionChars: metaDescription ? metaDescription.length : 0,
         isDescriptionTruncated: (metaDescription?.length || 0) > 155,
-        displayUrl: this.url.replace(/^https?:\/\//, '').replace(/\/$/, '')
+        displayUrl: this.url.replace(/^https?:\/\//, '').replace(/\/$/, ''),
+        breadcrumbs: breadcrumbDisplay,
+        faviconUrl: favicon || `${parsedUrl.origin}/favicon.ico`,
+        siteName: parsedUrl.hostname.replace(/^www\./, '')
       },
       mobile: {
         title: title || 'Untitled Page',
         metaDescription: metaDescription || 'No description provided.',
-        displayUrl: this.url.replace(/^https?:\/\//, '').replace(/\/$/, '')
+        displayUrl: this.url.replace(/^https?:\/\//, '').replace(/\/$/, ''),
+        breadcrumbs: breadcrumbDisplay,
+        faviconUrl: favicon || `${parsedUrl.origin}/favicon.ico`,
+        siteName: parsedUrl.hostname.replace(/^www\./, '')
       },
       social: {
         ogTitle: ogTitle || title || 'Untitled Page',
@@ -295,7 +303,8 @@ class PageAnalyzer {
         twitterCard: twitterCard || 'summary_large_image',
         twitterTitle: twitterTitle || title || 'Untitled Page',
         twitterDescription: twitterDescription || metaDescription || 'No description provided.',
-        twitterImage: twitterImage || ogImage || null
+        twitterImage: twitterImage || ogImage || null,
+        siteName: parsedUrl.hostname.replace(/^www\./, '')
       }
     };
 
@@ -376,7 +385,13 @@ class PageAnalyzer {
       structuredData: {
         schemas: detectedSchemas,
         hasJsonLd: detectedSchemas.length > 0,
-        details: schemaDetails
+        details: schemaDetails,
+        richResultsEligible: detectedSchemas.filter(s =>
+          ['Organization', 'LocalBusiness', 'FAQPage', 'BreadcrumbList', 'Product', 'Article', 'WebSite', 'Recipe'].some(target =>
+            String(s).toLowerCase().includes(target.toLowerCase())
+          )
+        ),
+        schemaValidationStatus: detectedSchemas.length > 0 ? 'Syntactically Valid JSON-LD' : 'None Detected'
       },
       local: {
         hasPhone,
@@ -440,6 +455,11 @@ class PageAnalyzer {
   _detectTechnologies($, rawText) {
     const generator = $('meta[name="generator"]').attr('content')?.toLowerCase() || '';
     const htmlString = this.html.toLowerCase();
+    const headers = this.headers || {};
+    const xPoweredBy = (headers['x-powered-by'] || '').toLowerCase();
+    const serverHeader = (headers['server'] || this.pageData?.server || '').toLowerCase();
+    const setCookie = (headers['set-cookie'] ? JSON.stringify(headers['set-cookie']) : '').toLowerCase();
+
     const scripts = [];
     $('script[src]').each((_, el) => scripts.push($(el).attr('src')?.toLowerCase() || ''));
     const scriptSrcs = scripts.join(' ');
@@ -447,49 +467,97 @@ class PageAnalyzer {
     const detected = {
       cms: [],
       frameworks: [],
+      backend: [],
       server: [],
       analytics: [],
-      cdn: []
+      cdn: [],
+      primaryStack: {
+        summary: 'Custom Web Architecture',
+        frontend: 'HTML5 & Modern CSS',
+        backend: 'Modern Web Server',
+        cms: 'Custom / Headless',
+        server: 'Standard Reverse Proxy',
+        confidence: 'High',
+        explanation: 'Standard web stack with custom component architecture.'
+      }
     };
 
-    // CMS Fingerprinting
+    // 1. Backend Language & Runtime Fingerprinting
+    if (xPoweredBy.includes('php') || setCookie.includes('phpsessid') || generator.includes('wordpress') || scriptSrcs.includes('wp-') || htmlString.includes('.php')) {
+      detected.backend.push({ name: 'PHP', badge: 'Backend Language', icon: '🐘', confidence: '98%' });
+    }
+    if (xPoweredBy.includes('express') || htmlString.includes('__next') || htmlString.includes('/_next/') || htmlString.includes('__nuxt') || htmlString.includes('/_nuxt/') || xPoweredBy.includes('node')) {
+      detected.backend.push({ name: 'Node.js', badge: 'JavaScript Runtime', icon: '🟢', confidence: '96%' });
+    }
+    if (setCookie.includes('csrftoken') || setCookie.includes('sessionid') || serverHeader.includes('gunicorn') || serverHeader.includes('uvicorn') || serverHeader.includes('werkzeug')) {
+      detected.backend.push({ name: 'Python (Django / FastAPI)', badge: 'Backend Language', icon: '🐍', confidence: '92%' });
+    }
+    if (xPoweredBy.includes('asp.net') || headers['x-aspnet-version'] || htmlString.includes('__viewstate') || htmlString.includes('.aspx')) {
+      detected.backend.push({ name: 'ASP.NET (.NET)', badge: 'Microsoft Framework', icon: '🔷', confidence: '99%' });
+    }
+    if (setCookie.includes('laravel_session') || setCookie.includes('xsrf-token') || htmlString.includes('livewire')) {
+      detected.backend.push({ name: 'Laravel (PHP)', badge: 'PHP Framework', icon: '🔴', confidence: '95%' });
+    }
+    if (setCookie.includes('jsessionid') || serverHeader.includes('tomcat') || serverHeader.includes('jetty')) {
+      detected.backend.push({ name: 'Java (Spring / Tomcat)', badge: 'JVM Backend', icon: '☕', confidence: '94%' });
+    }
+    if (detected.backend.length === 0) {
+      detected.backend.push({ name: 'Universal Web Engine', badge: 'Server Architecture', icon: '⚡', confidence: 'Standard' });
+    }
+
+    // 2. CMS Fingerprinting
     if (generator.includes('wordpress') || scriptSrcs.includes('wp-content') || scriptSrcs.includes('wp-includes')) {
-      detected.cms.push({ name: 'WordPress', badge: 'CMS' });
+      detected.cms.push({ name: 'WordPress', badge: 'CMS', icon: '📝' });
     }
     if (generator.includes('shopify') || scriptSrcs.includes('cdn.shopify.com')) {
-      detected.cms.push({ name: 'Shopify', badge: 'E-commerce' });
+      detected.cms.push({ name: 'Shopify', badge: 'E-commerce', icon: '🛍️' });
     }
-    if (generator.includes('webflow')) {
-      detected.cms.push({ name: 'Webflow', badge: 'No-Code CMS' });
+    if (generator.includes('webflow') || htmlString.includes('w-layout')) {
+      detected.cms.push({ name: 'Webflow', badge: 'No-Code CMS', icon: '🎨' });
     }
     if (generator.includes('wix') || scriptSrcs.includes('wix.com')) {
-      detected.cms.push({ name: 'Wix', badge: 'Site Builder' });
+      detected.cms.push({ name: 'Wix', badge: 'Site Builder', icon: '🌐' });
+    }
+    if (generator.includes('squarespace') || scriptSrcs.includes('squarespace.com')) {
+      detected.cms.push({ name: 'Squarespace', badge: 'Site Builder', icon: '🔳' });
+    }
+    if (generator.includes('drupal')) {
+      detected.cms.push({ name: 'Drupal', badge: 'Enterprise CMS', icon: '💧' });
+    }
+    if (generator.includes('joomla')) {
+      detected.cms.push({ name: 'Joomla', badge: 'CMS', icon: '🧩' });
     }
     if (detected.cms.length === 0) {
-      detected.cms.push({ name: 'Custom / Headless', badge: 'Web App' });
+      detected.cms.push({ name: 'Custom / Headless Web App', badge: 'Architecture', icon: '🚀' });
     }
 
-    // Frameworks & UI Engines
+    // 3. Frameworks & UI Engines
     if (htmlString.includes('__next') || scriptSrcs.includes('/_next/')) {
-      detected.frameworks.push({ name: 'Next.js', badge: 'React Framework' });
+      detected.frameworks.push({ name: 'Next.js', badge: 'React SSR Framework', icon: '▲' });
     }
-    if (htmlString.includes('data-reactroot') || scriptSrcs.includes('react') || htmlString.includes('react')) {
-      detected.frameworks.push({ name: 'React', badge: 'UI Library' });
+    if (htmlString.includes('data-reactroot') || scriptSrcs.includes('react') || htmlString.includes('react-dom')) {
+      detected.frameworks.push({ name: 'React', badge: 'UI Library', icon: '⚛️' });
+    }
+    if (htmlString.includes('__nuxt') || scriptSrcs.includes('/_nuxt/')) {
+      detected.frameworks.push({ name: 'Nuxt.js', badge: 'Vue SSR Framework', icon: '💚' });
     }
     if (htmlString.includes('data-v-') || scriptSrcs.includes('vue')) {
-      detected.frameworks.push({ name: 'Vue.js', badge: 'UI Framework' });
+      detected.frameworks.push({ name: 'Vue.js', badge: 'UI Framework', icon: '🟢' });
+    }
+    if (htmlString.includes('ng-version') || htmlString.includes('ng-app') || scriptSrcs.includes('angular')) {
+      detected.frameworks.push({ name: 'Angular', badge: 'SPA Framework', icon: '🅰️' });
     }
     if (htmlString.includes('tailwind') || htmlString.includes('class="flex ') || htmlString.includes('font-bold')) {
-      detected.frameworks.push({ name: 'Tailwind CSS', badge: 'CSS Engine' });
+      detected.frameworks.push({ name: 'Tailwind CSS', badge: 'CSS Engine', icon: '🌊' });
     }
     if (scriptSrcs.includes('bootstrap') || htmlString.includes('bootstrap.min.css')) {
-      detected.frameworks.push({ name: 'Bootstrap', badge: 'CSS Framework' });
+      detected.frameworks.push({ name: 'Bootstrap', badge: 'CSS Framework', icon: '🅱️' });
     }
     if (scriptSrcs.includes('jquery')) {
-      detected.frameworks.push({ name: 'jQuery', badge: 'DOM Library' });
+      detected.frameworks.push({ name: 'jQuery', badge: 'DOM Library', icon: '💲' });
     }
 
-    // Analytics & Tracking
+    // 4. Analytics & Tracking
     if (scriptSrcs.includes('gtag/js') || scriptSrcs.includes('google-analytics') || htmlString.includes('gtag(')) {
       detected.analytics.push({ name: 'Google Analytics 4', badge: 'Tracking' });
     }
@@ -503,22 +571,103 @@ class PageAnalyzer {
       detected.analytics.push({ name: 'Microsoft Clarity', badge: 'Heatmaps' });
     }
 
-    // Web Server & CDN
-    const serverHeader = (this.headers['server'] || '').toLowerCase();
-    const cfRay = this.headers['cf-ray'];
+    // 5. Web Server & CDN
+    const cfRay = headers['cf-ray'];
     if (cfRay || serverHeader.includes('cloudflare')) {
-      detected.cdn.push({ name: 'Cloudflare Edge', badge: 'CDN & WAF' });
+      detected.cdn.push({ name: 'Cloudflare Edge', badge: 'CDN & WAF', icon: '☁️' });
     }
     if (serverHeader.includes('nginx')) {
-      detected.server.push({ name: 'Nginx', badge: 'Web Server' });
+      detected.server.push({ name: 'Nginx', badge: 'Web Server', icon: '🛡️' });
     } else if (serverHeader.includes('apache')) {
-      detected.server.push({ name: 'Apache HTTPD', badge: 'Web Server' });
+      detected.server.push({ name: 'Apache HTTPD', badge: 'Web Server', icon: '🪶' });
     } else if (serverHeader.includes('litespeed')) {
-      detected.server.push({ name: 'LiteSpeed', badge: 'Web Server' });
+      detected.server.push({ name: 'LiteSpeed', badge: 'Web Server', icon: '⚡' });
     } else if (serverHeader.includes('caddy')) {
-      detected.server.push({ name: 'Caddy', badge: 'Web Server' });
+      detected.server.push({ name: 'Caddy', badge: 'Web Server', icon: '🔒' });
     } else {
-      detected.server.push({ name: serverHeader || 'Modern Reverse Proxy', badge: 'Server' });
+      detected.server.push({ name: serverHeader || 'Modern Reverse Proxy', badge: 'Server', icon: '🖥️' });
+    }
+
+    // 6. Synthesize Primary Stack Summary (Easy for Users)
+    const hasNext = detected.frameworks.some(f => f.name === 'Next.js');
+    const hasReact = detected.frameworks.some(f => f.name === 'React');
+    const hasVue = detected.frameworks.some(f => f.name.includes('Vue'));
+    const hasWP = detected.cms.some(c => c.name === 'WordPress');
+    const hasShopify = detected.cms.some(c => c.name === 'Shopify');
+    const hasPHP = detected.backend.some(b => b.name.includes('PHP'));
+    const hasNode = detected.backend.some(b => b.name.includes('Node'));
+    const serverName = detected.server[0]?.name || 'Web Server';
+
+    if (hasWP || (hasPHP && htmlString.includes('wp-'))) {
+      detected.primaryStack = {
+        summary: 'WordPress (PHP) on ' + serverName,
+        frontend: 'WordPress Themes & Vanilla JS',
+        backend: 'PHP 8.x / MySQL',
+        cms: 'WordPress CMS',
+        server: serverName,
+        confidence: '99%',
+        explanation: 'Built with WordPress and PHP. High-flexibility CMS; use server-side caching (Redis or WP Rocket) to optimize Core Web Vitals TTFB.'
+      };
+    } else if (hasNext) {
+      detected.primaryStack = {
+        summary: 'Next.js (React) + Node.js',
+        frontend: 'Next.js (React App Router / SSR)',
+        backend: 'Node.js Runtime',
+        cms: 'Headless / Custom',
+        server: serverName,
+        confidence: '98%',
+        explanation: 'Built with Next.js (React) and Node.js. Server-Side Rendering (SSR) ensures optimal Googlebot indexability and fast initial HTML response.'
+      };
+    } else if (hasReact) {
+      detected.primaryStack = {
+        summary: 'React Single Page App (SPA)',
+        frontend: 'React UI Engine',
+        backend: hasNode ? 'Node.js' : hasPHP ? 'PHP API' : 'REST API Backend',
+        cms: 'Custom Web Application',
+        server: serverName,
+        confidence: '94%',
+        explanation: 'Built with React. Ensure critical metadata and initial headings are rendered server-side or pre-rendered for search engines.'
+      };
+    } else if (hasVue) {
+      detected.primaryStack = {
+        summary: 'Vue.js / Nuxt Web Platform',
+        frontend: 'Vue.js Reactive Framework',
+        backend: hasNode ? 'Node.js (Nuxt Engine)' : 'Custom Backend',
+        cms: 'Custom Architecture',
+        server: serverName,
+        confidence: '94%',
+        explanation: 'Built with Vue.js. Clean reactive component architecture with high rendering performance.'
+      };
+    } else if (hasShopify) {
+      detected.primaryStack = {
+        summary: 'Shopify E-Commerce Cloud',
+        frontend: 'Liquid Templating & Modern JS',
+        backend: 'Shopify Cloud Infrastructure',
+        cms: 'Shopify Store',
+        server: 'Cloudflare / Shopify Edge',
+        confidence: '99%',
+        explanation: 'Hosted on Shopify e-commerce infrastructure. Clean product schema and fast global CDN distribution.'
+      };
+    } else if (hasPHP) {
+      detected.primaryStack = {
+        summary: 'PHP Web Application on ' + serverName,
+        frontend: detected.frameworks[0]?.name || 'Semantic HTML5',
+        backend: 'PHP Backend',
+        cms: 'Custom PHP Architecture',
+        server: serverName,
+        confidence: '92%',
+        explanation: 'Dynamic web application powered by PHP. Ensure Gzip/Brotli compression and opcode caching are enabled.'
+      };
+    } else if (hasNode) {
+      detected.primaryStack = {
+        summary: 'Node.js Full-Stack Application',
+        frontend: detected.frameworks[0]?.name || 'HTML5 & Modern CSS',
+        backend: 'Node.js / Express',
+        cms: 'Custom Architecture',
+        server: serverName,
+        confidence: '90%',
+        explanation: 'Full-stack JavaScript environment running on Node.js.'
+      };
     }
 
     return detected;

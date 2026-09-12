@@ -1,10 +1,12 @@
-import React from 'react';
-import { Menu, Plus, Sun, Moon, Globe, ShieldCheck } from 'lucide-react';
+import React, { useState } from 'react';
+import { Menu, Plus, Sun, Moon, Globe, ShieldCheck, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../hooks/useTheme';
+import TurboBoostModal from '../common/TurboBoostModal';
 
 export default function Topbar({ setMobileOpen, activeWebsite = null }) {
   const { isDark, toggleTheme } = useTheme();
+  const [turboOpen, setTurboOpen] = useState(false);
   const navigate = useNavigate();
 
   return (
@@ -37,11 +39,21 @@ export default function Topbar({ setMobileOpen, activeWebsite = null }) {
         </div>
 
         {/* Action Controls */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* Turbo Boost & Cache Button */}
+          <button
+            onClick={() => setTurboOpen(true)}
+            title="Clean cache & boost speed"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-amber-900 dark:text-amber-200 bg-amber-400/15 hover:bg-amber-400/25 border border-amber-500/30 transition-all hover:scale-105 active:scale-95"
+          >
+            <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+            <span className="hidden sm:inline">Turbo Boost</span>
+          </button>
+
           {/* Quick Start Audit Button */}
           <button
             onClick={() => navigate('/dashboard/new')}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold bg-brand-600 hover:bg-brand-700 text-white shadow-xs shadow-brand-500/20 transition-all"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-brand-600 hover:bg-brand-700 text-white shadow-xs shadow-brand-500/20 transition-all hover:scale-105 active:scale-95"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>New Audit</span>
@@ -51,12 +63,15 @@ export default function Topbar({ setMobileOpen, activeWebsite = null }) {
           <button
             onClick={toggleTheme}
             aria-label="Toggle dark/light mode"
-            className="p-2 rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="p-2 rounded-xl text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           >
             {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-600" />}
           </button>
         </div>
       </div>
+
+      {/* Turbo Boost Modal */}
+      <TurboBoostModal isOpen={turboOpen} onClose={() => setTurboOpen(false)} />
     </header>
   );
 }

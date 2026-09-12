@@ -19,6 +19,7 @@ router.post('/ai/generate-meta-description', optionalAuth, aiController.generate
 router.post('/ai/optimize-content', optionalAuth, aiController.optimizeContent);
 router.post('/ai/generate-fix', optionalAuth, aiController.generateFix);
 router.post('/ai/chat', optionalAuth, aiController.chat);
+router.post('/ai/council', optionalAuth, aiController.getCouncil);
 
 // PDF Reports Download Route
 router.get('/reports/:auditId', optionalAuth, reportController.getPdfReport);

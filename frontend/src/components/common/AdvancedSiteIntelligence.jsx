@@ -25,6 +25,7 @@ import {
   ExternalLink,
   Sliders
 } from 'lucide-react';
+import DetectedTechStackCard from './DetectedTechStackCard';
 
 export default function AdvancedSiteIntelligence({ siteIntelligence, audit, page }) {
   const [activeTab, setActiveTab] = useState('performance');
@@ -352,6 +353,8 @@ add_header Permissions-Policy "geolocation=(), microphone=(), camera=()" always;
       {/* 5. TAB 3: TECH STACK & CMS FINGERPRINTS */}
       {activeTab === 'techstack' && (
         <div className="space-y-6">
+          <DetectedTechStackCard techStack={tech} websiteUrl={websiteUrl} />
+
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {/* CMS */}
             <div className="p-5 rounded-3xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/70 space-y-3">

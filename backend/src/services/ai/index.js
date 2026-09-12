@@ -1,5 +1,6 @@
 const axios = require('axios');
 const logger = require('../../utils/logger');
+const aiCouncil = require('./aiCouncil');
 
 /**
  * AI Service for SEO Audits
@@ -598,6 +599,13 @@ Rules:
         'Reclaim unlinked brand mentions by searching Google for your company name'
       ]
     };
+  }
+
+  /**
+   * Autonomous 4-Agent SEO Council Evaluation
+   */
+  getCouncilEvaluation(auditData) {
+    return aiCouncil.evaluateCouncil(auditData);
   }
 }
 

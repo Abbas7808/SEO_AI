@@ -141,6 +141,40 @@ const aiController = {
     } catch (error) {
       next(error);
     }
+  },
+
+  async getCouncil(req, res, next) {
+    try {
+      const { auditId, auditData: customData } = req.body;
+      let auditData = customData || {};
+      if (auditId && !auditData.overallScore) {
+        const audit = await auditModel.findById(auditId);
+        const issues = await issueModel.findByAudit(auditId);
+        if (audit) {
+          auditData = {
+            websiteUrl: audit.website_url,
+            overallScore: audit.seo_score,
+            technicalScore: audit.technical_score,
+            onPageScore: audit.onpage_score,
+            contentScore: audit.content_score,
+            performanceScore: audit.performance_score,
+            structuredDataScore: audit.structured_data_score,
+            socialScore: audit.social_score,
+            localScore: audit.local_score,
+            mobileScore: audit.mobile_score,
+            desktopScore: audit.desktop_score,
+            issues
+          };
+        }
+      }
+      const councilResult = aiService.getCouncilEvaluation(auditData);
+      res.json({
+        success: true,
+        data: councilResult
+      });
+    } catch (error) {
+      next(error);
+    }
   }
 };
 
