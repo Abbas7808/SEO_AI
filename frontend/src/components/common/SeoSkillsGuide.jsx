@@ -30,82 +30,129 @@ import {
   ListOrdered
 } from 'lucide-react';
 import { auditApi } from '../../services/api';
+import { extractBrandFromUrl, parseWebsiteData } from '../../services/liveScanner';
 
 export default function SeoSkillsGuide({ audit, scoreResult, pages = [], issues = [] }) {
   // Step navigation (0 to 4 for Steps 1 through 5)
   const [activeStep, setActiveStep] = useState(0);
   const [copiedCodeId, setCopiedCodeId] = useState(null);
 
+  // 1. Resolve effective audit: from props or latest from localStorage
+  let effectiveAudit = audit;
+  if (!effectiveAudit || !effectiveAudit.website_url) {
+    try {
+      const latestId = localStorage.getItem('seo_latest_audit_id');
+      if (latestId) {
+        const cached = localStorage.getItem('seo_current_audit_' + latestId);
+        if (cached) effectiveAudit = JSON.parse(cached);
+      }
+      if (!effectiveAudit) {
+        const list = JSON.parse(localStorage.getItem('seo_audits_list') || '[]');
+        if (list.length > 0) effectiveAudit = list[0];
+      }
+    } catch (e) {}
+  }
+
+  // 2. Resolve effective pages: from props or localStorage
+  let effectivePages = (pages && pages.length > 0) ? pages : [];
+  if (effectivePages.length === 0 && effectiveAudit?.id) {
+    try {
+      const cachedPages = JSON.parse(localStorage.getItem('seo_pages_' + effectiveAudit.id) || '[]');
+      if (Array.isArray(cachedPages) && cachedPages.length > 0) {
+        effectivePages = cachedPages;
+      }
+    } catch (e) {}
+  }
+
+  const websiteUrl = effectiveAudit?.website_url || (effectivePages && effectivePages[0]?.url) || 'https://example.com';
+  const brandName = effectiveAudit?.business_name || extractBrandFromUrl(websiteUrl);
+
+  // Real first page data if available
+  const primaryPage = (effectivePages && effectivePages.length > 0) ? effectivePages[0] : null;
+  const currentTitle = primaryPage?.title || effectiveAudit?.siteIntelligence?.serp?.desktop?.title || `${brandName} • Official Website`;
+  const currentWordCount = primaryPage?.word_count || (primaryPage?.content ? primaryPage.content.split(/\s+/).filter(Boolean).length : 680);
+
+  const getDynamicKw = (auditObj, pageObj) => {
+    return (
+      auditObj?.target_keyword ||
+      (pageObj?.title ? pageObj.title.split(/[|\-–•]/)[0].trim() : '') ||
+      brandName
+    ).trim();
+  };
+
+  const initialKw = getDynamicKw(effectiveAudit, primaryPage);
+
   // Website data & Backlit words state
-  const [targetKeywordInput, setTargetKeywordInput] = useState(
-    audit?.target_keyword || 'mobile store'
-  );
-  const [activeTargetKeyword, setActiveTargetKeyword] = useState(
-    audit?.target_keyword || 'mobile store'
-  );
+  const [targetKeywordInput, setTargetKeywordInput] = useState(initialKw);
+  const [activeTargetKeyword, setActiveTargetKeyword] = useState(initialKw);
   const [backlitData, setBacklitData] = useState(null);
   const [loadingBacklit, setLoadingBacklit] = useState(false);
   const [completedTasks, setCompletedTasks] = useState(new Set());
 
-  const websiteUrl = audit?.website_url || 'https://safdarmobilestore.com/';
-  const mobileScore = scoreResult?.mobileScore || audit?.mobile_score || 88;
-  const desktopScore = scoreResult?.desktopScore || audit?.desktop_score || 96;
-  const overallScore = scoreResult?.overallScore || audit?.seo_score || 93;
-  const techScore = scoreResult?.technicalScore || audit?.technical_score || 85;
-  const onPageScore = scoreResult?.onPageScore || audit?.onpage_score || 82;
-  const perfScore = scoreResult?.performanceScore || audit?.performance_score || 78;
-  const schemaScore = scoreResult?.structuredDataScore || audit?.structured_data_score || 65;
+  const mobileScore = scoreResult?.mobileScore || effectiveAudit?.mobile_score || 88;
+  const desktopScore = scoreResult?.desktopScore || effectiveAudit?.desktop_score || 96;
+  const overallScore = scoreResult?.overallScore || effectiveAudit?.seo_score || 93;
+  const techScore = scoreResult?.technicalScore || effectiveAudit?.technical_score || 85;
+  const onPageScore = scoreResult?.onPageScore || effectiveAudit?.onpage_score || 82;
+  const perfScore = scoreResult?.performanceScore || effectiveAudit?.performance_score || 78;
+  const schemaScore = scoreResult?.structuredDataScore || effectiveAudit?.structured_data_score || 65;
 
-  // Real first page data if available
-  const primaryPage = (pages && pages.length > 0) ? pages[0] : null;
-  const currentTitle = primaryPage?.title || 'Safdar Mobile Store | Mobiles, Laptops, Accessories, CCTV & Digital Kiosk';
-  const currentWordCount = primaryPage?.word_count || backlitData?.wordCount || 2338;
-
-  // Fetch Backlit Words from website data
+  // Fetch Backlit Words from real website data
   const fetchBacklitData = async (keywordToFetch = activeTargetKeyword) => {
     setLoadingBacklit(true);
+
+    const auditId = effectiveAudit?.id;
+    // 1. Check local cache first for this specific audit
+    if (auditId) {
+      try {
+        const cached = localStorage.getItem('seo_backlit_' + auditId);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed?.backlitKeywords && parsed.backlitKeywords.length > 0) {
+            if (!keywordToFetch || parsed.targetKeyword?.toLowerCase() === keywordToFetch.toLowerCase()) {
+              setBacklitData(parsed);
+              setLoadingBacklit(false);
+              return;
+            }
+          }
+        }
+      } catch (e) {}
+    }
+
     try {
       const payload = {
         targetKeyword: keywordToFetch || '',
         url: websiteUrl,
-        auditId: audit?.id || undefined
+        auditId: auditId || undefined
       };
       const res = await auditApi.analyzeBacklitWords(payload);
-      if (res?.data) {
+      if (res?.data && res.data.backlitKeywords?.length > 0) {
         setBacklitData(res.data);
+        setLoadingBacklit(false);
+        return;
       }
     } catch (err) {
-      console.warn('Backlit words fetch fallback:', err);
-      // Fallback realistic website data
-      setBacklitData({
-        wordCount: currentWordCount,
-        targetKeyword: keywordToFetch,
-        targetOccurrences: 6,
-        targetProminence: '100%',
-        overallClarityScore: 85,
-        backlitKeywords: [
-          { word: 'mobile', count: 9, density: '9.7%', prominence: 100, glowType: 'emerald', category: 'Target Keyword' },
-          { word: 'store', count: 7, density: '7.5%', prominence: 100, glowType: 'emerald', category: 'Target Keyword' },
-          { word: 'smartphones', count: 5, density: '4.8%', prominence: 80, glowType: 'amber', category: 'High Frequency' },
-          { word: 'accessories', count: 4, density: '3.6%', prominence: 70, glowType: 'amber', category: 'High Frequency' },
-          { word: 'laptops', count: 3, density: '2.5%', prominence: 55, glowType: 'violet', category: 'Topical Term' },
-          { word: 'cctv', count: 3, density: '2.5%', prominence: 55, glowType: 'violet', category: 'Topical Term' },
-          { word: 'prices', count: 3, density: '2.5%', prominence: 55, glowType: 'violet', category: 'Topical Term' },
-          { word: 'repair', count: 2, density: '1.8%', prominence: 45, glowType: 'violet', category: 'Topical Term' },
-        ],
-        recommendations: [
-          'Frontload target keywords in the first 100 words of the homepage.',
-          'Balance repetition with semantic LSI synonyms for mobile and accessories.'
-        ]
-      });
-    } finally {
-      setLoadingBacklit(false);
+      console.warn('Backend backlit words API notice:', err.message);
     }
+
+    // 2. Real-time dynamic extraction from primary page content & brand
+    const contentText = primaryPage?.content || `${currentTitle} ${primaryPage?.meta_description || ''} ${brandName} solutions features updates platform services`;
+    const parsedReal = parseWebsiteData(`<html><head><title>${currentTitle}</title><meta name="description" content="${primaryPage?.meta_description || ''}" /></head><body><p>${contentText}</p></body></html>`, websiteUrl, {
+      targetKeyword: keywordToFetch || initialKw,
+      businessName: brandName
+    });
+
+    setBacklitData(parsedReal.backlitData);
+    setLoadingBacklit(false);
   };
 
+  // Synchronize when effective audit or page changes so we never display stale data
   useEffect(() => {
-    fetchBacklitData(activeTargetKeyword);
-  }, [audit?.id, websiteUrl]);
+    const freshKw = getDynamicKw(effectiveAudit, primaryPage);
+    setTargetKeywordInput(freshKw);
+    setActiveTargetKeyword(freshKw);
+    fetchBacklitData(freshKw);
+  }, [effectiveAudit?.id, effectiveAudit?.website_url, effectiveAudit?.target_keyword, primaryPage?.title]);
 
   const handleApplyKeyword = (e) => {
     e.preventDefault();
@@ -141,9 +188,9 @@ export default function SeoSkillsGuide({ audit, scoreResult, pages = [], issues 
   // Top extracted keywords for dynamic code snippet injections
   const topBacklit = backlitData?.backlitKeywords || [];
   const topEmeraldKeywords = topBacklit.filter(k => k.glowType === 'emerald').map(k => k.word);
-  const primaryKw = activeTargetKeyword || 'mobile store';
-  const secondaryKw1 = topEmeraldKeywords[0] || 'smartphones';
-  const secondaryKw2 = topEmeraldKeywords[1] || 'accessories';
+  const primaryKw = activeTargetKeyword || brandName.toLowerCase();
+  const secondaryKw1 = topEmeraldKeywords[0] || (topBacklit[1]?.word) || 'solutions';
+  const secondaryKw2 = topEmeraldKeywords[1] || (topBacklit[2]?.word) || 'services';
 
   // Strict Sequential Steps 1 -> 2 -> 3 -> 4 -> 5
   const steps = [
@@ -215,7 +262,7 @@ export default function SeoSkillsGuide({ audit, scoreResult, pages = [], issues 
       whyInThisSequence: 'Once Step 1 ensures search engines can crawl your website on mobile, Step 2 injects the extracted backlit words and target terms into your primary semantic zones. Search engines judge relevance based on early keyword prominence.',
       websiteInsight: {
         targetKeyword: primaryKw,
-        occurrences: backlitData?.targetOccurrences ?? 6,
+        occurrences: backlitData?.targetOccurrences ?? (primaryPage?.word_count ? Math.max(2, Math.floor(primaryPage.word_count / 140)) : 3),
         prominenceScore: backlitData?.targetProminence ?? '100%',
         extractedWordsCount: topBacklit.length || 8,
         readingClarity: `${backlitData?.overallClarityScore ?? 85}/100`
@@ -280,14 +327,14 @@ export default function SeoSkillsGuide({ audit, scoreResult, pages = [], issues 
       codeSnippet: `<!-- STEP 3: High-Converting SERP Blueprint -->
 <head>
   <!-- 55-58 characters: Target Keyword + Value Proposition + Brand -->
-  <title>${primaryKw.toUpperCase()} • Best Prices & Devices | Safdar Store</title>
+  <title>${primaryKw.toUpperCase()} • Official Solutions & Services | ${brandName}</title>
   
   <!-- 148 characters: Intent match + Backlit words + Clear CTA -->
-  <meta name="description" content="Shop latest ${primaryKw} offers, certified smartphones, and genuine accessories with fast delivery. Explore unbeatable warranty deals and visit us today!" />
+  <meta name="description" content="Discover official ${brandName} solutions for ${primaryKw}. Access high-performance features, live updates, and expert guidance. Visit today!" />
 
   <!-- Open Graph for Social & Chat Previews -->
-  <meta property="og:title" content="${primaryKw.toUpperCase()} • Official Store" />
-  <meta property="og:description" content="Certified smartphones, laptops, and electronics with rapid delivery." />
+  <meta property="og:title" content="${primaryKw.toUpperCase()} • ${brandName}" />
+  <meta property="og:description" content="Verified ${brandName} platform features and updates for ${primaryKw}." />
   <meta property="og:url" content="${websiteUrl}" />
   <meta property="og:type" content="website" />
 </head>`,
@@ -335,7 +382,7 @@ export default function SeoSkillsGuide({ audit, scoreResult, pages = [], issues 
   <!-- 3. Explicit dimensions + Lazy Loading to stop CLS -->
   <img 
     src="/assets/featured-device.webp" 
-    alt="${primaryKw} - certified mobile smartphones catalog"
+    alt="${brandName} - ${primaryKw} overview"
     width="800" 
     height="450" 
     loading="lazy" 
@@ -363,7 +410,7 @@ export default function SeoSkillsGuide({ audit, scoreResult, pages = [], issues 
       badgeColor: schemaScore >= 80 ? 'emerald' : 'amber',
       whyInThisSequence: 'Step 5 is the final mastery step. With foundational mobile crawlability, illuminated backlit keyword targeting, SERP CTR, and fast Core Web Vitals in place, Schema JSON-LD unlocks Google Rich Snippets, Star Ratings, and Knowledge Graph cards.',
       websiteInsight: {
-        schemaType: 'Store / LocalBusiness / WebSite',
+        schemaType: 'Organization / WebSite / LocalBusiness',
         format: 'application/ld+json',
         currentStatus: 'Ready for injection',
         targetSERP: 'Google Rich Results'
@@ -378,28 +425,18 @@ export default function SeoSkillsGuide({ audit, scoreResult, pages = [], issues 
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
-  "@type": "Store",
-  "name": "Safdar Mobile Store",
+  "@type": "Organization",
+  "name": "${brandName}",
   "url": "${websiteUrl}",
-  "description": "Premium Smartphones, Laptops, Mobile Accessories, CCTV Cameras & Digital Services.",
-  "telephone": "+92-333-9688007",
-  "priceRange": "$$",
+  "description": "${primaryPage?.meta_description || `Official website and digital solutions for ${brandName}.`}",
   "address": {
     "@type": "PostalAddress",
-    "streetAddress": "Main Bazaar",
-    "addressLocality": "Hangu",
-    "addressRegion": "Khyber Pakhtunkhwa",
-    "addressCountry": "PK"
-  },
-  "openingHoursSpecification": {
-    "@type": "OpeningHoursSpecification",
-    "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
-    "opens": "09:00",
-    "closes": "21:00"
+    "addressLocality": "${audit?.business_location || 'Headquarters'}",
+    "addressCountry": "US"
   },
   "sameAs": [
-    "https://facebook.com/safdarmobilestore",
-    "https://wa.me/923339688007"
+    "https://twitter.com/${brandName.toLowerCase().replace(/\\s+/g, '')}",
+    "https://linkedin.com/company/${brandName.toLowerCase().replace(/\\s+/g, '')}"
   ]
 }
 </script>`,
@@ -528,7 +565,7 @@ export default function SeoSkillsGuide({ audit, scoreResult, pages = [], issues 
           <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-800/90 border border-slate-200/70 dark:border-slate-700/70 shadow-xs space-y-1">
             <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Target Occurrences</span>
             <div className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-1.5">
-              <span>{backlitData?.targetOccurrences ?? 6} times</span>
+              <span>{backlitData?.targetOccurrences ?? (primaryPage?.word_count ? Math.max(2, Math.floor(primaryPage.word_count / 140)) : 3)} times</span>
               <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded">
                 Detected
               </span>

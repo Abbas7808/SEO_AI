@@ -14,7 +14,7 @@ import {
   Zap,
   Sparkles
 } from 'lucide-react';
-import { auditApi } from '../services/api';
+import { scanLiveWebsite } from '../services/liveScanner';
 
 export default function StartAuditPage() {
   const [searchParams] = useSearchParams();
@@ -65,48 +65,14 @@ export default function StartAuditPage() {
     setAuditProgress({ stepIndex: 0, percent: 5, currentStep: auditSteps[0] });
 
     try {
-      let auditId = 'audit_' + Date.now();
-      try {
-        // 1. Submit audit to backend
-        const res = await auditApi.createAudit({
-          websiteUrl: websiteUrl.trim(),
-          maxPages: Number(maxPages),
-          targetKeyword: targetKeyword.trim() || undefined,
-          businessName: businessName.trim() || undefined,
-          businessLocation: businessLocation.trim() || undefined,
-        });
-        if (res?.data?.audit?.id) {
-          auditId = res.data.audit.id;
-        }
-      } catch (apiErr) {
-        console.warn('Backend audit API unavailable, running local client audit engine:', apiErr.message);
-        // Save local audit object so DashboardOverview & IssuesPage can load it
-        const localAudit = {
-          id: auditId,
-          website_url: websiteUrl.trim(),
-          seo_score: 82,
-          score: 82,
-          mobile_score: 79,
-          desktop_score: 85,
-          pages_crawled: Math.min(Number(maxPages), 14),
-          created_at: new Date().toISOString(),
-          target_keyword: targetKeyword.trim() || null,
-          business_name: businessName.trim() || null,
-          business_location: businessLocation.trim() || null,
-          technical_score: 88,
-          onpage_score: 81,
-          content_score: 76,
-          performance_score: 84,
-          structured_data_score: 90,
-          social_score: 85,
-        };
-        try {
-          const list = JSON.parse(localStorage.getItem('seo_audits_list') || '[]');
-          list.unshift(localAudit);
-          localStorage.setItem('seo_audits_list', JSON.stringify(list));
-          localStorage.setItem('seo_current_audit_' + auditId, JSON.stringify(localAudit));
-        } catch (e) {}
-      }
+      // 1. Execute live real-time website scan and DOM extraction
+      const scanResult = await scanLiveWebsite(websiteUrl.trim(), {
+        targetKeyword: targetKeyword.trim(),
+        businessName: businessName.trim(),
+        businessLocation: businessLocation.trim(),
+      });
+
+      const auditId = scanResult.audit.id;
 
       // 2. Animate step progress simulation for UI feedback
       for (let i = 0; i < auditSteps.length; i++) {
@@ -243,7 +209,7 @@ export default function StartAuditPage() {
                   type="text"
                   value={targetKeyword}
                   onChange={(e) => setTargetKeyword(e.target.value)}
-                  placeholder="e.g. mobile repair shop"
+                  placeholder="e.g. cloud security solutions"
                   className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                 />
               </div>
@@ -284,7 +250,7 @@ export default function StartAuditPage() {
                   type="text"
                   value={businessName}
                   onChange={(e) => setBusinessName(e.target.value)}
-                  placeholder="e.g. Safdar Mobile Store"
+                  placeholder="e.g. Acme Corporation"
                   className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                 />
               </div>
@@ -303,7 +269,7 @@ export default function StartAuditPage() {
                   type="text"
                   value={businessLocation}
                   onChange={(e) => setBusinessLocation(e.target.value)}
-                  placeholder="e.g. Hangu, KPK"
+                  placeholder="e.g. San Francisco, CA"
                   className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                 />
               </div>

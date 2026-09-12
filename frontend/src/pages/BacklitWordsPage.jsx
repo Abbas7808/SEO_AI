@@ -19,6 +19,7 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { auditApi } from '../services/api';
+import { fetchLiveHtml, parseWebsiteData, extractBrandFromUrl } from '../services/liveScanner';
 
 export default function BacklitWordsPage() {
   const [searchParams] = useSearchParams();
@@ -47,20 +48,44 @@ export default function BacklitWordsPage() {
   // 1. Fetch Audits List
   useEffect(() => {
     async function loadAudits() {
+      let loadedList = [];
       try {
         const res = await auditApi.getAudits();
         if (res?.data?.audits && res.data.audits.length > 0) {
-          setAuditsList(res.data.audits);
-          if (!selectedAuditId) {
-            setSelectedAuditId(res.data.audits[0].id);
-            if (res.data.audits[0].target_keyword) {
-              setTargetKeyword(res.data.audits[0].target_keyword);
-            }
-          }
+          loadedList = res.data.audits;
         }
       } catch (err) {
-        console.error('Failed to load audits:', err);
+        console.warn('Backend audits fetch notice:', err.message);
       }
+
+      if (loadedList.length === 0) {
+        try {
+          loadedList = JSON.parse(localStorage.getItem('seo_audits_list') || '[]');
+        } catch (e) {}
+      }
+
+      if (loadedList.length > 0) {
+        setAuditsList(loadedList);
+        const targetAudit = loadedList.find(a => a.id === selectedAuditId) || loadedList[0];
+        if (targetAudit) {
+          if (!selectedAuditId) setSelectedAuditId(targetAudit.id);
+          if (targetAudit.target_keyword) setTargetKeyword(targetAudit.target_keyword);
+          if (targetAudit.website_url) setUrlInput(targetAudit.website_url);
+
+          // Check if there is cached page content for this audit
+          try {
+            const pages = JSON.parse(localStorage.getItem(`seo_pages_${targetAudit.id}`) || '[]');
+            if (pages[0]?.content) {
+              setContentInput(pages[0].content);
+              handleScan(pages[0].content, targetAudit.target_keyword || 'search optimization');
+              return;
+            }
+          } catch (e) {}
+        }
+      }
+
+      // Initial scan with demo text on load if no audit content found
+      handleScan(defaultSample, targetKeyword || 'search optimization');
     }
     loadAudits();
   }, []);
@@ -76,18 +101,13 @@ export default function BacklitWordsPage() {
           setBacklinkData(res.data.backlinkProfile);
         }
       } catch (err) {
-        console.error('Failed to load backlink analysis:', err);
+        console.warn('Backlink analysis notice:', err.message);
       } finally {
         setLoadingBacklinks(false);
       }
     }
     loadBacklinks();
   }, [selectedAuditId]);
-
-  // Initial scan with demo text on load
-  useEffect(() => {
-    handleScan(defaultSample, targetKeyword || 'search optimization');
-  }, []);
 
   const handleScan = async (textToScan, keywordToScan) => {
     const text = textToScan !== undefined ? textToScan : contentInput;
@@ -102,14 +122,41 @@ export default function BacklitWordsPage() {
         url: urlInput
       });
 
-      if (res?.data) {
+      if (res?.data && res.data.backlitKeywords?.length > 0) {
         setBacklitResult(res.data);
         if (!contentInput && res.data.contentSample) {
           setContentInput(res.data.contentSample);
         }
+        return;
       }
     } catch (err) {
-      alert(err.message || 'Failed to scan backlit words');
+      console.warn('Backend analyzeBacklitWords notice:', err.message);
+    }
+
+    // Client-side real-time live HTML scan fallback
+    try {
+      let liveHtml = '';
+      if (urlInput) {
+        liveHtml = await fetchLiveHtml(urlInput);
+      }
+
+      const parsed = parseWebsiteData(
+        liveHtml || `<html><body><p>${text || defaultSample}</p></body></html>`,
+        urlInput || 'https://example.com',
+        {
+          targetKeyword: kw,
+          businessName: extractBrandFromUrl(urlInput || 'https://example.com')
+        }
+      );
+
+      if (parsed.backlitData) {
+        setBacklitResult(parsed.backlitData);
+        if (!contentInput) {
+          setContentInput(parsed.primaryPage?.content || text || defaultSample);
+        }
+      }
+    } catch (err) {
+      console.error('Client-side backlit scan failed:', err);
     } finally {
       setScanning(false);
     }

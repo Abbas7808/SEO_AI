@@ -17,10 +17,32 @@ import ScoreBadge from '../components/common/ScoreBadge';
 import { aiApi } from '../services/api';
 
 export default function ContentOptimizerPage() {
-  const [keyword, setKeyword] = useState('mobile repair hangu');
-  const [content, setContent] = useState(
-    `Welcome to our mobile store. We offer mobile repair services in Hangu. Our technicians fix cracked screens, water damage, and battery replacements. We also offer high-quality CCTV camera security setups for local homes and shops.`
-  );
+  // Read initial keyword and content from latest live audit if available
+  const getInitialData = () => {
+    try {
+      const latestId = localStorage.getItem('seo_latest_audit_id');
+      const list = JSON.parse(localStorage.getItem('seo_audits_list') || '[]');
+      const activeAudit = (latestId ? list.find(a => a.id === latestId) : null) || list[0];
+      if (activeAudit) {
+        let pages = [];
+        try {
+          pages = JSON.parse(localStorage.getItem(`seo_pages_${activeAudit.id}`) || '[]');
+        } catch(e) {}
+        const page = pages[0];
+        const initialKw = activeAudit.target_keyword || (page?.title ? page.title.split(/[|\-–•]/)[0].trim() : '') || activeAudit.business_name || 'search engine optimization';
+        const initialContent = page?.content || (page?.meta_description ? `${page.title}. ${page.meta_description}` : '') || `Welcome to ${activeAudit.business_name || 'our platform'}. We deliver verified solutions designed to elevate organic search visibility and digital performance.`;
+        return { keyword: initialKw, content: initialContent };
+      }
+    } catch (e) {}
+    return {
+      keyword: 'search engine optimization',
+      content: 'Search engine optimization (SEO) is the practice of improving website architecture and content relevance to gain organic search traffic. Key focus areas include mobile responsiveness, Core Web Vitals, title tags, and structured data.'
+    };
+  };
+
+  const initial = getInitialData();
+  const [keyword, setKeyword] = useState(initial.keyword);
+  const [content, setContent] = useState(initial.content);
   const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState(null);
 
@@ -43,36 +65,41 @@ export default function ContentOptimizerPage() {
         keywordDensity: data.keywordDensity.replace('%', ''),
         readability: data.readability,
         recommendations: data.recommendations || [
-          'Include target keyword in first paragraph',
+          `Include target keyword "${keyword}" in first paragraph`,
           'Expand content depth to 400+ words'
         ],
         missingSemanticKeywords: data.missingTopics || [
-          'warranty guarantee',
-          'fast turnaround',
-          'original replacement parts'
+          `${keyword} architecture`,
+          'performance optimization',
+          'implementation guidelines'
         ]
       });
     } catch (err) {
-      // Fallback calculation
-      const words = content.trim().split(/\s+/).length;
-      const occurrences = (content.toLowerCase().match(new RegExp(keyword.toLowerCase(), 'g')) || []).length;
+      // Dynamic fallback calculation
+      const words = content.trim().split(/\s+/).filter(Boolean).length;
+      const occurrences = (content.toLowerCase().match(new RegExp(keyword.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length;
       const density = words > 0 ? ((occurrences * keyword.split(' ').length) / words) * 100 : 0;
       
+      const kwTokens = keyword.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+      const generatedSemanticKeywords = [
+        ...kwTokens.map(t => `${t} best practices`),
+        ...kwTokens.map(t => `${t} architecture`),
+        'implementation strategy',
+        'performance diagnostics'
+      ].slice(0, 4);
+
       setResult({
-        score: words > 150 ? 76 : 62,
+        score: words > 150 ? 78 : 62,
         wordCount: words,
         keywordOccurrences: occurrences,
         keywordDensity: density.toFixed(1),
         readability: 'Good',
         recommendations: [
-          'Include the target keyword in the first paragraph within the initial 50 words.',
+          `Include the target keyword "${keyword}" in the first paragraph within the initial 50 words.`,
           'Expand content depth to at least 350 words to improve semantic authority.',
+          'Incorporate secondary topic headings (H2, H3) covering key user search queries.'
         ],
-        missingSemanticKeywords: [
-          'screen replacement',
-          'battery repair warranty',
-          'fast turnaround',
-        ],
+        missingSemanticKeywords: generatedSemanticKeywords,
       });
     } finally {
       setAnalyzing(false);
@@ -107,7 +134,7 @@ export default function ContentOptimizerPage() {
                   required
                   value={keyword}
                   onChange={(e) => setKeyword(e.target.value)}
-                  placeholder="e.g. mobile repair hangu"
+                  placeholder="e.g. search engine optimization"
                   className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                 />
               </div>

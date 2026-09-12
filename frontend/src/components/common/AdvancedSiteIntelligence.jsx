@@ -26,6 +26,7 @@ import {
   Sliders
 } from 'lucide-react';
 import DetectedTechStackCard from './DetectedTechStackCard';
+import { extractBrandFromUrl } from '../../services/liveScanner';
 
 export default function AdvancedSiteIntelligence({ siteIntelligence, audit, page }) {
   const [activeTab, setActiveTab] = useState('performance');
@@ -42,6 +43,9 @@ export default function AdvancedSiteIntelligence({ siteIntelligence, audit, page
   const links = intel.linkEquity || {};
   const schemas = intel.schemas || [];
   const websiteUrl = audit?.website_url || page?.url || 'https://example.com';
+  const brandName = audit?.business_name || extractBrandFromUrl(websiteUrl);
+  const fallbackTitle = page?.title || `${brandName} • Official Website`;
+  const fallbackDescription = page?.meta_description || `Official website and solutions for ${brandName}. Discover features, verified updates, and support.`;
 
   const handleCopy = (code, id) => {
     navigator.clipboard.writeText(code);
@@ -485,14 +489,14 @@ add_header Permissions-Policy "geolocation=(), microphone=(), camera=()" always;
                 <span>&rsaquo; official</span>
               </div>
               <h3 className="text-lg font-medium text-[#1a0dab] dark:text-[#8ab4f8] hover:underline cursor-pointer leading-snug">
-                {serp.desktop?.title || 'Safdar Mobile Store | Mobiles, Laptops, Accessories & Services'}
+                {serp.desktop?.title || fallbackTitle}
               </h3>
               <p className="text-xs text-[#4d5156] dark:text-[#bdc1c6] leading-relaxed">
-                {serp.desktop?.metaDescription || 'Explore latest certified smartphones, genuine mobile accessories, fast charging adapters, laptop solutions, and quick local services with warranty.'}
+                {serp.desktop?.metaDescription || fallbackDescription}
               </p>
               <div className="flex items-center gap-4 text-[11px] text-slate-400 pt-2 border-t border-slate-100 dark:border-slate-800">
-                <span>Title Length: <strong className="text-slate-700 dark:text-slate-200">{serp.desktop?.titleLengthChars || 58} chars</strong> (50-60 optimal)</span>
-                <span>Pixel Width: <strong className="text-slate-700 dark:text-slate-200">{serp.desktop?.titleLengthPx || 556}px</strong> (&lt; 580px limit)</span>
+                <span>Title Length: <strong className="text-slate-700 dark:text-slate-200">{serp.desktop?.titleLengthChars || fallbackTitle.length} chars</strong> (50-60 optimal)</span>
+                <span>Pixel Width: <strong className="text-slate-700 dark:text-slate-200">{serp.desktop?.titleLengthPx || Math.min(580, fallbackTitle.length * 10)}px</strong> (&lt; 580px limit)</span>
               </div>
             </div>
           )}
@@ -502,17 +506,17 @@ add_header Permissions-Policy "geolocation=(), microphone=(), camera=()" always;
             <div className="max-w-sm mx-auto p-5 rounded-3xl bg-white dark:bg-slate-950 border-2 border-slate-300 dark:border-slate-700 space-y-2 shadow-lg">
               <div className="flex items-center gap-2 text-[11px] text-slate-500">
                 <div className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs">
-                  S
+                  {brandName.charAt(0)}
                 </div>
                 <div className="truncate">
                   <span className="font-bold text-slate-700 dark:text-slate-200 block truncate">{websiteUrl.replace(/^https?:\/\//, '')}</span>
                 </div>
               </div>
               <h4 className="text-base font-semibold text-[#1a0dab] dark:text-[#8ab4f8] leading-tight">
-                {serp.desktop?.title || 'Safdar Mobile Store'}
+                {serp.desktop?.title || fallbackTitle}
               </h4>
               <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-3">
-                {serp.desktop?.metaDescription}
+                {serp.desktop?.metaDescription || fallbackDescription}
               </p>
             </div>
           )}

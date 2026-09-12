@@ -161,26 +161,60 @@ export default function IssuesPage() {
 
   useEffect(() => {
     async function loadIssues() {
-      let loadedAudit = null;
-      try {
-        const cached = localStorage.getItem('seo_current_audit_' + auditId);
-        if (cached) {
-          loadedAudit = JSON.parse(cached);
-          setCurrentAudit(loadedAudit);
-        }
-      } catch (e) {}
+      let targetId = auditId;
+      if (!targetId) {
+        try {
+          targetId = localStorage.getItem('seo_latest_audit_id');
+          if (!targetId) {
+            const list = JSON.parse(localStorage.getItem('seo_audits_list') || '[]');
+            if (list.length > 0 && list[0]?.id) {
+              targetId = list[0].id;
+            }
+          }
+        } catch (e) {}
+      }
 
-      if (auditId) {
+      let loadedAudit = null;
+      if (targetId) {
+        try {
+          const cached = localStorage.getItem('seo_current_audit_' + targetId);
+          if (cached) {
+            loadedAudit = JSON.parse(cached);
+            setCurrentAudit(loadedAudit);
+          }
+          const cachedPages = localStorage.getItem('seo_pages_' + targetId);
+          if (cachedPages) {
+            const parsedPages = JSON.parse(cachedPages);
+            if (Array.isArray(parsedPages) && parsedPages.length > 0) {
+              setAuditPages(parsedPages);
+            }
+          }
+          const cachedIntel = localStorage.getItem('seo_site_intel_' + targetId);
+          if (cachedIntel) {
+            setSiteIntelligence(JSON.parse(cachedIntel));
+          }
+          const cachedIssues = localStorage.getItem('seo_issues_' + targetId);
+          if (cachedIssues) {
+            const parsedIssues = JSON.parse(cachedIssues);
+            if (Array.isArray(parsedIssues) && parsedIssues.length > 0) {
+              setIssues(parsedIssues);
+              setExpandedIssueId(parsedIssues[0]?.id);
+            }
+          }
+        } catch (e) {}
+      }
+
+      if (targetId) {
         try {
           setLoading(true);
           const [issuesRes, auditRes] = await Promise.all([
-            auditApi.getIssues(auditId).catch(() => null),
-            auditApi.getAuditById(auditId).catch(() => null)
+            auditApi.getIssues(targetId).catch(() => null),
+            auditApi.getAuditById(targetId).catch(() => null)
           ]);
           if (auditRes?.data?.audit) {
             loadedAudit = auditRes.data.audit;
             setCurrentAudit(loadedAudit);
-            if (auditRes?.data?.pages) {
+            if (auditRes?.data?.pages?.length > 0) {
               setAuditPages(auditRes.data.pages);
             }
             if (auditRes?.data?.siteIntelligence) {
@@ -189,27 +223,15 @@ export default function IssuesPage() {
           }
           if (issuesRes?.data?.issues && issuesRes.data.issues.length > 0) {
             setIssues(issuesRes.data.issues);
-            // Expand first critical or high issue automatically
             const firstImportant = issuesRes.data.issues.find(i => i.severity === 'critical' || i.severity === 'high');
             if (firstImportant) setExpandedIssueId(firstImportant.id);
-          } else {
-            const targetSite = loadedAudit?.website_url || 'https://example.com';
-            const mappedDemo = demoIssues.map(i => ({
-              ...i,
-              page_url: i.page_url ? i.page_url.replace('https://example.com', targetSite.replace(/\/$/, '')) : targetSite
-            }));
-            setIssues(mappedDemo);
-            setExpandedIssueId(mappedDemo[0].id);
           }
         } catch (err) {
-          setIssues(demoIssues);
-          setExpandedIssueId(demoIssues[0].id);
+          console.warn('Backend issues fetch warning:', err);
         } finally {
           setLoading(false);
         }
       } else {
-        setIssues(demoIssues);
-        setExpandedIssueId(demoIssues[0].id);
         setLoading(false);
       }
     }
@@ -312,30 +334,30 @@ export default function IssuesPage() {
       {/* 1. DUAL SCORE HERO DISPLAY (Mobile SEO & Desktop SEO Score) */}
       <DualScoreHero audit={currentAudit} scoreResult={currentAudit} />
 
-      {/* DETECTED TECHNOLOGY STACK (PHP, React, Node.js, etc.) */}
+      {/* DETECTED TECHNOLOGY STACK */}
       <DetectedTechStackCard 
         techStack={siteIntelligence?.techStack || auditPages[0]?.content_details?.techStack || currentAudit?.techStack || {
           primaryStack: {
-            summary: currentAudit?.website_url?.includes('safdar') ? 'WordPress (PHP) on Apache' : 'Next.js (React) + Node.js Engine',
-            frontend: currentAudit?.website_url?.includes('safdar') ? 'WordPress Theme / jQuery' : 'React 18 / Next.js',
-            backend: currentAudit?.website_url?.includes('safdar') ? 'PHP 8.2 / MySQL' : 'Node.js Runtime',
-            cms: currentAudit?.website_url?.includes('safdar') ? 'WordPress CMS' : 'Headless Web App',
-            server: 'Cloudflare / Edge Proxy',
+            summary: 'Modern Web Application',
+            frontend: 'HTML5 / Modern JavaScript',
+            backend: 'Cloud Hosting / CDN',
+            cms: 'Custom Architecture',
+            server: 'Edge Server Proxy',
             confidence: '98%',
             explanation: `Identified core technology stack for ${currentAudit?.website_url || 'the website'}. Providing exact stack identification ensures all recommended fixes match your framework.`
           },
           backend: [
-            { name: currentAudit?.website_url?.includes('safdar') ? 'PHP 8.2' : 'Node.js', badge: 'Backend Engine', icon: currentAudit?.website_url?.includes('safdar') ? '🐘' : '🟢' }
+            { name: 'Cloud Infrastructure', badge: 'Backend Engine', icon: '🟢' }
           ],
           frameworks: [
-            { name: currentAudit?.website_url?.includes('safdar') ? 'WordPress / jQuery' : 'React 18 / Next.js', badge: 'Frontend', icon: '⚛️' },
-            { name: 'Tailwind CSS', badge: 'Styling', icon: '🌊' }
+            { name: 'HTML5 / Modern JS', badge: 'Frontend', icon: '⚡' },
+            { name: 'CSS3 / Modern Layout', badge: 'Styling', icon: '🎨' }
           ],
           cms: [
-            { name: currentAudit?.website_url?.includes('safdar') ? 'WordPress' : 'Custom Headless', badge: 'CMS', icon: '📝' }
+            { name: 'Headless / Custom', badge: 'Architecture', icon: '📝' }
           ],
           server: [
-            { name: 'Cloudflare / Edge', badge: 'Edge Server', icon: '☁️' }
+            { name: 'Cloud Edge Server', badge: 'Edge Proxy', icon: '☁️' }
           ]
         }}
         websiteUrl={currentAudit?.website_url || 'https://example.com'}
