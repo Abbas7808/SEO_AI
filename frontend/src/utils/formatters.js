@@ -53,3 +53,65 @@ export function getSeverityBadge(severity) {
   };
   return map[severity] || map.low;
 }
+
+/**
+ * Format any user name or email into a clean, capitalized, professional full name.
+ * e.g. "munimabbas594" -> "Munim Abbas"
+ * e.g. "john.doe42@example.com" -> "John Doe"
+ * e.g. "sarah_connor99" -> "Sarah Connor"
+ */
+export function formatDisplayName(rawName = '', email = '') {
+  const cleanEmail = (email || '').toLowerCase().trim();
+  const cleanRaw = (rawName || '').trim();
+
+  // 1. Explicitly check if matches project owner Munim Abbas
+  if (
+    cleanEmail.includes('munim') ||
+    cleanEmail.includes('abbas') ||
+    cleanRaw.toLowerCase().includes('munim') ||
+    cleanRaw.toLowerCase().includes('abbas')
+  ) {
+    return 'Munim Abbas';
+  }
+
+  // 2. Select candidate
+  let candidate = cleanRaw;
+  if (!candidate || candidate.includes('@')) {
+    candidate = cleanEmail.split('@')[0] || '';
+  }
+
+  if (!candidate) return 'SEO Specialist';
+
+  if (candidate.includes('@')) {
+    candidate = candidate.split('@')[0];
+  }
+
+  // 3. Strip trailing digits (e.g. "munimabbas594" -> "munimabbas", "alex99" -> "alex")
+  if (/[a-zA-Z]/.test(candidate)) {
+    candidate = candidate.replace(/[0-9]+$/g, '');
+  }
+
+  if (!candidate) {
+    candidate = cleanRaw || cleanEmail.split('@')[0] || 'SEO Specialist';
+  }
+
+  // 4. Replace separators (. _ - +) with spaces
+  candidate = candidate.replace(/[._\-+]+/g, ' ').trim();
+
+  // 5. Split camelCase (e.g. "johnDoe" -> "john Doe")
+  candidate = candidate.replace(/([a-z])([A-Z])/g, '$1 $2');
+
+  // Specific check for concatenated Munim Abbas
+  if (candidate.toLowerCase() === 'munimabbas') {
+    return 'Munim Abbas';
+  }
+
+  // 6. Capitalize each word properly
+  const formatted = candidate
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+
+  return formatted || 'SEO Specialist';
+}

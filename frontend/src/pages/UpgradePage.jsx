@@ -29,6 +29,7 @@ import {
   submitPaymentProof,
   redeemLicenseKey
 } from '../utils/planLimits';
+import { formatDisplayName } from '../utils/formatters';
 
 export default function UpgradePage() {
   const { user } = useAuth();
@@ -40,7 +41,7 @@ export default function UpgradePage() {
   const [selectedMethod, setSelectedMethod] = useState('easypaisa');
 
   // Form State
-  const [name, setName] = useState(user?.name || '');
+  const [name, setName] = useState(formatDisplayName(user?.name, user?.email));
   const [email, setEmail] = useState(user?.email || '');
   const [transactionId, setTransactionId] = useState('');
   const [notes, setNotes] = useState('');

@@ -22,7 +22,7 @@ import {
 import { auditApi } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import ScoreBadge from '../components/common/ScoreBadge';
-import { formatDate } from '../utils/formatters';
+import { formatDate, formatDisplayName } from '../utils/formatters';
 import SerpPreviewCard from '../components/common/SerpPreviewCard';
 import AiCouncilCard from '../components/common/AiCouncilCard';
 import DetectedTechStackCard from '../components/common/DetectedTechStackCard';
@@ -30,6 +30,7 @@ import { exportAuditToJson, exportAuditToMarkdown, exportIssuesToCsv } from '../
 
 export default function DashboardOverview() {
   const { user } = useAuth();
+  const displayName = formatDisplayName(user?.name, user?.email);
   const [audits, setAudits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [quickUrl, setQuickUrl] = useState('');
@@ -154,7 +155,7 @@ export default function DashboardOverview() {
             </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
-            Welcome back, {user?.name || 'SEO Specialist'}
+            Welcome back, {displayName}
           </h1>
           <p className="text-xs sm:text-sm text-brand-100 max-w-2xl leading-relaxed">
             Autonomous crawling, multi-agent AI council reviews, Core Web Vitals lab diagnostics, and instant multi-framework code repairs for your digital footprint.

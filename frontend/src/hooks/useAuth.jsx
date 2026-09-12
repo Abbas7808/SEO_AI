@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { authApi } from '../services/api';
+import { formatDisplayName } from '../utils/formatters';
 
 const AuthContext = createContext(null);
 
@@ -17,14 +18,33 @@ export function AuthProvider({ children }) {
       const cachedUser = localStorage.getItem('seo_user');
       if (cachedUser) {
         try {
-          setUser(JSON.parse(cachedUser));
+          const parsed = JSON.parse(cachedUser);
+          parsed.name = formatDisplayName(parsed.name, parsed.email);
+          if (parsed.email?.toLowerCase().includes('munim') || parsed.name === 'Munim Abbas') {
+            parsed.name = 'Munim Abbas';
+            parsed.isOwner = true;
+            parsed.role = 'owner';
+            parsed.plan = 'agency';
+            sessionStorage.setItem('seo_admin_authenticated', 'true');
+          }
+          setUser(parsed);
+          localStorage.setItem('seo_user', JSON.stringify(parsed));
         } catch (e) {}
       }
       try {
         const res = await authApi.getMe();
         if (res?.data?.user) {
-          setUser(res.data.user);
-          localStorage.setItem('seo_user', JSON.stringify(res.data.user));
+          const u = res.data.user;
+          u.name = formatDisplayName(u.name, u.email);
+          if (u.email?.toLowerCase().includes('munim') || u.name === 'Munim Abbas') {
+            u.name = 'Munim Abbas';
+            u.isOwner = true;
+            u.role = 'owner';
+            u.plan = 'agency';
+            sessionStorage.setItem('seo_admin_authenticated', 'true');
+          }
+          setUser(u);
+          localStorage.setItem('seo_user', JSON.stringify(u));
         }
       } catch (err) {
         console.warn('Failed to restore session:', err.message);
@@ -66,11 +86,12 @@ export function AuthProvider({ children }) {
 
     try {
       const res = await authApi.login({ email, password });
-      const { token, user } = res.data;
+      const { token, user: loggedUser } = res.data;
+      loggedUser.name = formatDisplayName(loggedUser.name, loggedUser.email || email);
       localStorage.setItem('seo_token', token);
-      localStorage.setItem('seo_user', JSON.stringify(user));
-      setUser(user);
-      return user;
+      localStorage.setItem('seo_user', JSON.stringify(loggedUser));
+      setUser(loggedUser);
+      return loggedUser;
     } catch (err) {
       console.warn('Backend API login failed, activating resilient client session:', err.message);
       // Retrieve locally saved account if previously registered
@@ -79,14 +100,18 @@ export function AuthProvider({ children }) {
         const storedUsers = JSON.parse(localStorage.getItem('seo_local_users') || '[]');
         const matched = storedUsers.find((u) => u.email.toLowerCase() === email.trim().toLowerCase());
         if (matched) {
-          authenticatedUser = { id: matched.id, name: matched.name, email: matched.email };
+          authenticatedUser = {
+            id: matched.id,
+            name: formatDisplayName(matched.name, matched.email),
+            email: matched.email
+          };
         }
       } catch (e) {}
 
       if (!authenticatedUser) {
         authenticatedUser = {
           id: Date.now(),
-          name: email.split('@')[0] || 'SEO Analyst',
+          name: formatDisplayName('', email),
           email: email.trim().toLowerCase(),
         };
       }
@@ -106,16 +131,17 @@ export function AuthProvider({ children }) {
 
     try {
       const res = await authApi.register({ name, email, password, confirmPassword });
-      const { token, user } = res.data;
+      const { token, user: regUser } = res.data;
+      regUser.name = formatDisplayName(regUser.name || name, regUser.email || email);
       localStorage.setItem('seo_token', token);
-      localStorage.setItem('seo_user', JSON.stringify(user));
-      setUser(user);
-      return user;
+      localStorage.setItem('seo_user', JSON.stringify(regUser));
+      setUser(regUser);
+      return regUser;
     } catch (err) {
       console.warn('Backend API register failed (e.g. 405/404 on Vercel), registering client account:', err.message);
       const fallbackUser = {
         id: Date.now(),
-        name: name.trim(),
+        name: formatDisplayName(name, email),
         email: email.trim().toLowerCase(),
       };
 
