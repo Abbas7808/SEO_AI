@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
-import { Sparkles, ArrowRight, Lock, Mail, AlertCircle } from 'lucide-react';
+import { Sparkles, ArrowRight, Lock, Mail, AlertCircle, Crown } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
 export default function LoginPage() {
@@ -11,7 +11,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, loginAsOwner } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -34,6 +34,11 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleOwnerLogin = () => {
+    loginAsOwner();
+    navigate(from, { replace: true });
   };
 
   return (
@@ -105,7 +110,22 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div className="mt-6 text-center text-xs text-slate-500 dark:text-slate-400">
+        {/* Project Owner 1-Click Access */}
+        <div className="mt-5 pt-5 border-t border-slate-200 dark:border-slate-800">
+          <button
+            type="button"
+            onClick={handleOwnerLogin}
+            className="w-full py-2.5 px-4 rounded-xl font-extrabold text-xs bg-gradient-to-r from-indigo-600 via-brand-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-md shadow-indigo-500/20 flex items-center justify-center gap-2 transition-all group"
+          >
+            <Crown className="w-4 h-4 text-amber-300 group-hover:scale-110 transition-transform" />
+            <span>Sign in as Munim Abbas (Project Owner)</span>
+          </button>
+          <span className="text-[10px] text-center block text-slate-400 dark:text-slate-500 mt-1.5">
+            Instant owner access with full unlimited permissions
+          </span>
+        </div>
+
+        <div className="mt-5 text-center text-xs text-slate-500 dark:text-slate-400">
           Don't have an account?{' '}
           <Link to="/register" className="text-brand-600 dark:text-brand-400 font-semibold hover:underline">
             Register now

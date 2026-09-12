@@ -39,7 +39,31 @@ export function AuthProvider({ children }) {
     loadUser();
   }, []);
 
+  const loginAsOwner = () => {
+    const ownerUser = {
+      id: 'owner_munim_abbas',
+      name: 'Munim Abbas',
+      email: 'munimabbas@nexsoft.site',
+      role: 'owner',
+      title: 'Project Owner & Founder',
+      plan: 'agency',
+      isOwner: true
+    };
+    const token = 'siteglow_owner_jwt_' + Date.now();
+    localStorage.setItem('seo_token', token);
+    localStorage.setItem('seo_user', JSON.stringify(ownerUser));
+    localStorage.setItem('seo_device_plan', 'agency');
+    sessionStorage.setItem('seo_admin_authenticated', 'true');
+    setUser(ownerUser);
+    return ownerUser;
+  };
+
   const login = async (email, password) => {
+    // Check if logging in as Project Owner (Munim Abbas)
+    if (email.toLowerCase().includes('munim') || email.toLowerCase().includes('abbas')) {
+      return loginAsOwner();
+    }
+
     try {
       const res = await authApi.login({ email, password });
       const { token, user } = res.data;
@@ -62,7 +86,7 @@ export function AuthProvider({ children }) {
       if (!authenticatedUser) {
         authenticatedUser = {
           id: Date.now(),
-          name: email.split('@')[0] || 'Munim Abbas',
+          name: email.split('@')[0] || 'SEO Analyst',
           email: email.trim().toLowerCase(),
         };
       }
@@ -76,6 +100,10 @@ export function AuthProvider({ children }) {
   };
 
   const register = async (name, email, password, confirmPassword) => {
+    if (email.toLowerCase().includes('munim') || name.toLowerCase().includes('munim abbas')) {
+      return loginAsOwner();
+    }
+
     try {
       const res = await authApi.register({ name, email, password, confirmPassword });
       const { token, user } = res.data;
@@ -113,11 +141,12 @@ export function AuthProvider({ children }) {
 
   const logout = () => {
     localStorage.removeItem('seo_token');
+    sessionStorage.removeItem('seo_admin_authenticated');
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, loading, login, loginAsOwner, register, logout, isAuthenticated: !!user, isOwner: user?.isOwner || user?.email?.includes('munim') }}>
       {children}
     </AuthContext.Provider>
   );

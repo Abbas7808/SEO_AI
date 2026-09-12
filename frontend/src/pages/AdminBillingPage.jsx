@@ -21,14 +21,20 @@ import {
 } from 'lucide-react';
 import {
   ADMIN_PASSCODE,
+  OWNER_ACCOUNT,
+  isProjectOwner,
   getAllPaymentRequests,
   approvePaymentRequest,
   rejectPaymentRequest,
   manualActivateMember,
   generateLicenseKey
 } from '../utils/planLimits';
+import { useAuth } from '../hooks/useAuth';
 
 export default function AdminBillingPage() {
+  const { user, loginAsOwner } = useAuth();
+  const isOwner = isProjectOwner(user?.email) || user?.isOwner;
+
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [passcode, setPasscode] = useState('');
   const [authError, setAuthError] = useState('');
@@ -56,13 +62,14 @@ export default function AdminBillingPage() {
   const [copiedKey, setCopiedKey] = useState('');
 
   useEffect(() => {
-    // Check if session admin unlocked
+    // If logged in as project owner Munim Abbas or session admin unlocked, authenticate directly
     const sessionAuth = sessionStorage.getItem('seo_admin_authenticated');
-    if (sessionAuth === 'true') {
+    if (sessionAuth === 'true' || isOwner) {
       setIsAuthenticated(true);
+      sessionStorage.setItem('seo_admin_authenticated', 'true');
       loadAllData();
     }
-  }, []);
+  }, [user, isOwner]);
 
   const loadAllData = () => {
     setRequests(getAllPaymentRequests());
@@ -210,6 +217,20 @@ export default function AdminBillingPage() {
             <span>Unlock Admin Panel</span>
           </button>
         </form>
+
+        <div className="pt-4 border-t border-slate-200 dark:border-slate-800 text-center">
+          <button
+            type="button"
+            onClick={() => {
+              loginAsOwner();
+              setIsAuthenticated(true);
+            }}
+            className="w-full py-2.5 px-3 rounded-xl font-extrabold text-xs bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 border border-indigo-200 dark:border-indigo-800 flex items-center justify-center gap-2 transition-colors"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+            <span>Instant Login as Munim Abbas (Project Owner)</span>
+          </button>
+        </div>
       </div>
     );
   }
@@ -221,9 +242,15 @@ export default function AdminBillingPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-6">
         <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-xs font-bold uppercase tracking-wider mb-2">
-            <ShieldCheck className="w-3.5 h-3.5" />
-            <span>Owner Control Panel • SiteGlow AI</span>
+          <div className="flex flex-wrap items-center gap-2 mb-2">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-xs font-bold uppercase tracking-wider">
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>Owner Control Panel • SiteGlow AI</span>
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-xs font-black">
+              <span>👑 Project Owner: Munim Abbas</span>
+              <span className="text-[10px] opacity-70 font-mono">munimabbas@nexsoft.site</span>
+            </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
             Customer Payments & Member Approvals

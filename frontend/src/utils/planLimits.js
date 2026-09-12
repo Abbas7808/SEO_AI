@@ -108,10 +108,59 @@ export const PRICING_PLANS = [
   }
 ];
 
+// Project Owner Account Configuration (Munim Abbas)
+export const OWNER_ACCOUNT = {
+  name: 'Munim Abbas',
+  email: 'munimabbas@nexsoft.site',
+  role: 'owner',
+  title: 'Project Owner & Founder',
+  plan: 'agency',
+  isOwner: true
+};
+
+export const OWNER_EMAILS = [
+  'munimabbas@nexsoft.site',
+  'munim@nexsoft.site',
+  'munim.abbas@nexsoft.site',
+  'munimabbas@gmail.com',
+  'munim@audit.local'
+];
+
+/**
+ * Check if given user or active session belongs to the project owner (Munim Abbas)
+ */
+export function isProjectOwner(userEmail = '') {
+  try {
+    const email = (userEmail || '').toLowerCase().trim();
+    if (OWNER_EMAILS.includes(email) || email.includes('munim')) {
+      return true;
+    }
+    const activeUser = JSON.parse(localStorage.getItem('seo_user') || 'null');
+    if (activeUser?.isOwner || activeUser?.role === 'owner') {
+      return true;
+    }
+    if (activeUser?.name?.toLowerCase().includes('munim abbas')) {
+      return true;
+    }
+    if (activeUser?.email) {
+      const uEmail = activeUser.email.toLowerCase().trim();
+      if (OWNER_EMAILS.includes(uEmail) || uEmail.includes('munim')) {
+        return true;
+      }
+    }
+  } catch (e) {}
+  return false;
+}
+
 /**
  * Get active user plan status ('free' | 'pro' | 'agency')
  */
 export function getUserPlan(userEmail = '') {
+  // Project owner Munim Abbas has permanent top-tier Enterprise/Agency plan
+  if (isProjectOwner(userEmail)) {
+    return 'agency';
+  }
+
   try {
     // 1. Check if user is manually granted pro in approved members list
     const approvedMembers = JSON.parse(localStorage.getItem('seo_approved_members') || '{}');
@@ -144,8 +193,9 @@ export function getUserPlan(userEmail = '') {
  * Get count of project audits conducted so far
  */
 export function getTrialUsage(userEmail = '') {
-  const plan = getUserPlan(userEmail);
-  const isPro = plan === 'pro' || plan === 'agency';
+  const isOwner = isProjectOwner(userEmail);
+  const plan = isOwner ? 'agency' : getUserPlan(userEmail);
+  const isPro = isOwner || plan === 'pro' || plan === 'agency';
 
   let auditsCount = 0;
   try {
@@ -159,6 +209,7 @@ export function getTrialUsage(userEmail = '') {
   return {
     plan,
     isPro,
+    isOwner,
     auditsCount,
     maxFreeAudits: MAX_FREE_AUDITS,
     auditsRemaining,
@@ -171,6 +222,7 @@ export function getTrialUsage(userEmail = '') {
  * Check if the user is allowed to start a new audit
  */
 export function canPerformAudit(userEmail = '') {
+  if (isProjectOwner(userEmail)) return true;
   const usage = getTrialUsage(userEmail);
   return !usage.isLimitReached;
 }
