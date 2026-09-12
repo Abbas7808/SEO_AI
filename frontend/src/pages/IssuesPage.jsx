@@ -297,7 +297,8 @@ export default function IssuesPage() {
   };
 
   // Filter and search
-  const filteredIssues = issues.filter((issue) => {
+  const safeIssues = Array.isArray(issues) ? issues : [];
+  const filteredIssues = safeIssues.filter((issue) => {
     const solution = getIssueSolution(issue, currentAudit?.website_url);
     const matchesSeverity = activeSeverityFilter === 'all' || issue.severity === activeSeverityFilter;
     
@@ -324,10 +325,10 @@ export default function IssuesPage() {
     return matchesSeverity && matchesCategory && matchesSearch;
   });
 
-  const criticalCount = issues.filter(i => i.severity === 'critical').length;
-  const highCount = issues.filter(i => i.severity === 'high').length;
-  const mediumCount = issues.filter(i => i.severity === 'medium').length;
-  const passedCount = issues.filter(i => i.severity === 'passed').length;
+  const criticalCount = safeIssues.filter(i => i.severity === 'critical').length;
+  const highCount = safeIssues.filter(i => i.severity === 'high').length;
+  const mediumCount = safeIssues.filter(i => i.severity === 'medium').length;
+  const passedCount = safeIssues.filter(i => i.severity === 'passed').length;
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto pb-16">

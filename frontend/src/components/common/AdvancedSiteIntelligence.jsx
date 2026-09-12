@@ -41,7 +41,7 @@ export default function AdvancedSiteIntelligence({ siteIntelligence, audit, page
   const intent = intel.searchIntent || {};
   const serp = intel.serpSimulator || {};
   const links = intel.linkEquity || {};
-  const schemas = intel.schemas || [];
+  const schemas = Array.isArray(intel.schemas) ? intel.schemas : [];
   const websiteUrl = audit?.website_url || page?.url || 'https://example.com';
   const brandName = audit?.business_name || extractBrandFromUrl(websiteUrl);
   const fallbackTitle = page?.title || `${brandName} • Official Website`;
@@ -355,99 +355,92 @@ add_header Permissions-Policy "geolocation=(), microphone=(), camera=()" always;
       )}
 
       {/* 5. TAB 3: TECH STACK & CMS FINGERPRINTS */}
-      {activeTab === 'techstack' && (
-        <div className="space-y-6">
-          <DetectedTechStackCard techStack={tech} websiteUrl={websiteUrl} />
+      {activeTab === 'techstack' && (() => {
+        const toArray = (val, defaultName) => {
+          if (Array.isArray(val)) return val.map(item => typeof item === 'string' ? { name: item } : item);
+          if (typeof val === 'string' && val.trim()) return [{ name: val.trim() }];
+          if (defaultName) return [{ name: defaultName }];
+          return [];
+        };
+        const cmsArr = toArray(tech.cms, 'Custom Architecture');
+        const frameworksArr = toArray(tech.frameworks || tech.frontend, 'Modern JavaScript & HTML5');
+        const serverArr = toArray(tech.server, 'Edge Reverse Proxy');
+        const analyticsArr = toArray(tech.analytics, 'Google Analytics 4');
+        const cdnArr = toArray(tech.cdn, 'Cloudflare / Fastly CDN');
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {/* CMS */}
-            <div className="p-5 rounded-3xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/70 space-y-3">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Content Management</span>
-              <div className="flex flex-wrap gap-2">
-                {tech.cms && tech.cms.length > 0 ? (
-                  tech.cms.map((c, i) => (
+        return (
+          <div className="space-y-6">
+            <DetectedTechStackCard techStack={tech} websiteUrl={websiteUrl} />
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* CMS */}
+              <div className="p-5 rounded-3xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/70 space-y-3">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Content Management</span>
+                <div className="flex flex-wrap gap-2">
+                  {cmsArr.map((c, i) => (
                     <span key={i} className="px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 flex items-center gap-1.5">
                       <Globe className="w-3.5 h-3.5" />
-                      {c.name}
+                      {c.name || (typeof c === 'string' ? c : 'Custom CMS')}
                     </span>
-                  ))
-                ) : (
-                  <span className="text-xs text-slate-500">Custom Web App</span>
-                )}
+                  ))}
+                </div>
               </div>
-            </div>
 
-            {/* Frameworks & UI */}
-            <div className="p-5 rounded-3xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/70 space-y-3">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">UI Engines & Frameworks</span>
-              <div className="flex flex-wrap gap-2">
-                {tech.frameworks && tech.frameworks.length > 0 ? (
-                  tech.frameworks.map((f, i) => (
+              {/* Frameworks & UI */}
+              <div className="p-5 rounded-3xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/70 space-y-3">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">UI Engines & Frameworks</span>
+                <div className="flex flex-wrap gap-2">
+                  {frameworksArr.map((f, i) => (
                     <span key={i} className="px-3 py-1.5 rounded-xl text-xs font-bold bg-cyan-50 dark:bg-cyan-950/60 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800 flex items-center gap-1.5">
                       <Code2 className="w-3.5 h-3.5" />
-                      {f.name}
+                      {f.name || (typeof f === 'string' ? f : 'HTML5 UI')}
                     </span>
-                  ))
-                ) : (
-                  <span className="text-xs text-slate-500">Tailwind CSS & JavaScript</span>
-                )}
+                  ))}
+                </div>
               </div>
-            </div>
 
-            {/* Web Server */}
-            <div className="p-5 rounded-3xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/70 space-y-3">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Web Server Architecture</span>
-              <div className="flex flex-wrap gap-2">
-                {tech.server && tech.server.length > 0 ? (
-                  tech.server.map((s, i) => (
+              {/* Web Server */}
+              <div className="p-5 rounded-3xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/70 space-y-3">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Web Server Architecture</span>
+                <div className="flex flex-wrap gap-2">
+                  {serverArr.map((s, i) => (
                     <span key={i} className="px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 flex items-center gap-1.5">
                       <Server className="w-3.5 h-3.5" />
-                      {s.name}
+                      {s.name || (typeof s === 'string' ? s : 'Origin Server')}
                     </span>
-                  ))
-                ) : (
-                  <span className="text-xs text-slate-500">Nginx Reverse Proxy</span>
-                )}
+                  ))}
+                </div>
               </div>
-            </div>
 
-            {/* Analytics */}
-            <div className="p-5 rounded-3xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/70 space-y-3">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Analytics & Telemetry</span>
-              <div className="flex flex-wrap gap-2">
-                {tech.analytics && tech.analytics.length > 0 ? (
-                  tech.analytics.map((a, i) => (
+              {/* Analytics */}
+              <div className="p-5 rounded-3xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/70 space-y-3">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Analytics & Telemetry</span>
+                <div className="flex flex-wrap gap-2">
+                  {analyticsArr.map((a, i) => (
                     <span key={i} className="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 flex items-center gap-1.5">
                       <Activity className="w-3.5 h-3.5" />
-                      {a.name}
+                      {a.name || (typeof a === 'string' ? a : 'Analytics Engine')}
                     </span>
-                  ))
-                ) : (
-                  <span className="text-xs text-slate-500">Google Analytics 4</span>
-                )}
+                  ))}
+                </div>
               </div>
-            </div>
 
-            {/* CDN & Edge */}
-            <div className="p-5 rounded-3xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/70 space-y-3">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">CDN & Edge Protection</span>
-              <div className="flex flex-wrap gap-2">
-                {tech.cdn && tech.cdn.length > 0 ? (
-                  tech.cdn.map((c, i) => (
-                    <span key={i} className="px-3 py-1.5 rounded-xl text-xs font-bold bg-teal-50 dark:bg-teal-950/60 text-teal-800 dark:text-teal-300 border border-teal-200 dark:border-teal-800 flex items-center gap-1.5">
-                      <Globe className="w-3.5 h-3.5" />
-                      {c.name}
+              {/* CDN & Edge */}
+              <div className="p-5 rounded-3xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/70 space-y-3">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">CDN & Edge Protection</span>
+                <div className="flex flex-wrap gap-2">
+                  {cdnArr.map((cdn, i) => (
+                    <span key={i} className="px-3 py-1.5 rounded-xl text-xs font-bold bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 flex items-center gap-1.5">
+                      <Shield className="w-3.5 h-3.5" />
+                      {cdn.name || (typeof cdn === 'string' ? cdn : 'Global CDN')}
                     </span>
-                  ))
-                ) : (
-                  <span className="text-xs text-slate-500">Cloudflare Edge</span>
-                )}
+                  ))}
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
-
+        );
+      })()}
       {/* 6. TAB 4: SERP & SOCIAL LIVE SIMULATOR */}
       {activeTab === 'serp' && (
         <div className="space-y-6">

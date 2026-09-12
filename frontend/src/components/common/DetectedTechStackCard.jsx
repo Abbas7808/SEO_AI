@@ -13,21 +13,31 @@ import {
 } from 'lucide-react';
 
 export default function DetectedTechStackCard({ techStack = {}, websiteUrl = 'https://example.com' }) {
-  const primary = techStack.primaryStack || {
-    summary: 'React & Next.js (Node.js Engine)',
-    frontend: 'React / Next.js',
-    backend: 'Node.js',
-    cms: 'Custom Headless',
-    server: 'Cloudflare / Nginx',
+  const primary = techStack?.primaryStack || {
+    summary: techStack?.summary || 'Modern Web Application',
+    frontend: typeof techStack?.frontend === 'string' ? techStack.frontend : 'React / Next.js',
+    backend: typeof techStack?.backend === 'string' ? techStack.backend : 'Node.js',
+    cms: typeof techStack?.cms === 'string' ? techStack.cms : 'Custom Headless',
+    server: typeof techStack?.server === 'string' ? techStack.server : 'Cloudflare / Nginx',
     confidence: '98%',
-    explanation: 'Built with React and Node.js. Server-side rendering (SSR) enables fast crawler indexing and high Core Web Vitals responsiveness.'
+    explanation: 'Built with modern web standards. Server-side rendering and static optimization enable fast crawler indexing and high Core Web Vitals responsiveness.'
   };
 
-  const frameworks = techStack.frameworks || [];
-  const cmsList = techStack.cms || [];
-  const backendList = techStack.backend || [];
-  const serverList = techStack.server || [];
-  const cdnList = techStack.cdn || [];
+  const toList = (val, defaultBadge, defaultIcon) => {
+    if (Array.isArray(val)) {
+      return val.map(item => (typeof item === 'string' ? { name: item, badge: defaultBadge, icon: defaultIcon } : item));
+    }
+    if (typeof val === 'string' && val.trim()) {
+      return [{ name: val.trim(), badge: defaultBadge, icon: defaultIcon }];
+    }
+    return [];
+  };
+
+  const frameworks = toList(techStack?.frameworks || techStack?.frontend, 'Frontend', '⚡');
+  const cmsList = toList(techStack?.cms, 'CMS', '📝');
+  const backendList = toList(techStack?.backend, 'Backend', '🟢');
+  const serverList = toList(techStack?.server, 'Server', '☁️');
+  const cdnList = toList(techStack?.cdn, 'Edge CDN', '🛡️');
 
   let domain = 'website';
   try {
@@ -37,10 +47,10 @@ export default function DetectedTechStackCard({ techStack = {}, websiteUrl = 'ht
   }
 
   // Get primary badges
-  const backendName = backendList[0]?.name || primary.backend || 'Node.js / Universal';
-  const frontendName = frameworks[0]?.name || primary.frontend || 'React UI Engine';
-  const cmsName = cmsList[0]?.name || primary.cms || 'Custom Web Platform';
-  const serverName = serverList[0]?.name || primary.server || 'Modern Edge Proxy';
+  const backendName = typeof primary.backend === 'string' ? primary.backend : (backendList[0]?.name || 'Node.js / Universal');
+  const frontendName = typeof primary.frontend === 'string' ? primary.frontend : (frameworks[0]?.name || 'React UI Engine');
+  const cmsName = typeof primary.cms === 'string' ? primary.cms : (cmsList[0]?.name || 'Custom Web Platform');
+  const serverName = typeof primary.server === 'string' ? primary.server : (serverList[0]?.name || 'Modern Edge Proxy');
 
   return (
     <div className="glass-card rounded-3xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-xl transition-all">
