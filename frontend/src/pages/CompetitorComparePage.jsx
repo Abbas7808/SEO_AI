@@ -12,6 +12,7 @@ import {
   BarChart3
 } from 'lucide-react';
 import { auditApi } from '../services/api';
+import { compareAuditsLive } from '../services/liveScanner';
 import ScoreBadge from '../components/common/ScoreBadge';
 
 export default function CompetitorComparePage() {
@@ -73,11 +74,33 @@ export default function CompetitorComparePage() {
     try {
       setComparing(true);
       setError('');
-      const res = await auditApi.compareAudits({ urlA: urlA.trim(), urlB: urlB.trim() });
-      if (res?.data) {
-        setCompareResult(res.data);
+
+      let resultData = null;
+
+      // 1. If backend API is configured, try backend first
+      if (import.meta.env.VITE_API_URL) {
+        try {
+          const res = await auditApi.compareAudits({ urlA: urlA.trim(), urlB: urlB.trim() });
+          if (res?.data) {
+            resultData = res.data;
+          }
+        } catch (apiErr) {
+          console.warn('Backend compareAudits unavailable, using client live comparator:', apiErr.message);
+        }
+      }
+
+      // 2. Real-time client-side live dual scan
+      if (!resultData) {
+        resultData = await compareAuditsLive(urlA.trim(), urlB.trim());
+      }
+
+      if (resultData) {
+        setCompareResult(resultData);
+      } else {
+        throw new Error('Comparison could not be completed for these URLs.');
       }
     } catch (err) {
+      console.error('Comparison error:', err);
       setError(err.message || 'Comparison failed. Please verify URLs.');
     } finally {
       setComparing(false);

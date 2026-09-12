@@ -16,6 +16,7 @@ import {
   FileCheck
 } from 'lucide-react';
 import { auditApi } from '../services/api';
+import { inspectSiteLive } from '../services/liveScanner';
 
 export default function SiteInspectorPage() {
   const [searchParams] = useSearchParams();
@@ -33,11 +34,33 @@ export default function SiteInspectorPage() {
     try {
       setInspecting(true);
       setError('');
-      const res = await auditApi.inspectSite({ websiteUrl: u.trim() });
-      if (res?.data) {
-        setResult(res.data);
+
+      let inspectionData = null;
+
+      // 1. If backend API is configured, try backend first
+      if (import.meta.env.VITE_API_URL) {
+        try {
+          const res = await auditApi.inspectSite({ websiteUrl: u.trim() });
+          if (res?.data) {
+            inspectionData = res.data;
+          }
+        } catch (apiErr) {
+          console.warn('Backend inspectSite endpoint unavailable, using live client scanner:', apiErr.message);
+        }
+      }
+
+      // 2. Real-time direct client-side live inspection
+      if (!inspectionData) {
+        inspectionData = await inspectSiteLive(u.trim());
+      }
+
+      if (inspectionData) {
+        setResult(inspectionData);
+      } else {
+        throw new Error('Could not retrieve inspection data for this website.');
       }
     } catch (err) {
+      console.error('Inspection error:', err);
       setError(err.message || 'Inspection failed. Please verify the URL.');
     } finally {
       setInspecting(false);

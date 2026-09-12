@@ -50,7 +50,7 @@ export function extractBrandFromUrl(url) {
 /**
  * Fetches live HTML using direct fetch with fast fallback to reliable public CORS proxies
  */
-export async function fetchLiveHtml(url) {
+export async function fetchLiveHtml(url, minLength = 15) {
   const targetUrl = url.startsWith('http') ? url : `https://${url}`;
 
   // 1. Try direct fetch (works if CORS allowed or same domain)
@@ -61,7 +61,7 @@ export async function fetchLiveHtml(url) {
     clearTimeout(timeoutId);
     if (res.ok) {
       const text = await res.text();
-      if (text && text.length > 200) return text;
+      if (text && text.length >= minLength) return text;
     }
   } catch (e) {
     // Expected to fail on cross-origin without CORS headers
@@ -83,7 +83,7 @@ export async function fetchLiveHtml(url) {
       clearTimeout(timeoutId);
       if (res.ok) {
         const text = await res.text();
-        if (text && text.length > 200) {
+        if (text && text.length >= minLength) {
           return text;
         }
       }
@@ -604,4 +604,205 @@ export async function scanLiveWebsite(websiteUrl, options = {}) {
   }
 
   return parsed;
+}
+
+/**
+ * Inspects a website's robots.txt and sitemap.xml in real time
+ */
+export async function inspectSiteLive(websiteUrl) {
+  let cleanUrl = (websiteUrl || '').trim();
+  if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
+    cleanUrl = `https://${cleanUrl}`;
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(cleanUrl);
+  } catch (e) {
+    throw new Error('Please provide a valid website URL.');
+  }
+
+  const origin = `${parsed.protocol}//${parsed.host}`;
+  const robotsUrl = `${origin}/robots.txt`;
+  const defaultSitemapUrl = `${origin}/sitemap.xml`;
+
+  // 1. Fetch robots.txt
+  const robotsStart = Date.now();
+  let robotsText = '';
+  let robotsStatusCode = 200;
+  try {
+    robotsText = (await fetchLiveHtml(robotsUrl, 5)) || '';
+    if (!robotsText) robotsStatusCode = 404;
+  } catch (err) {
+    robotsStatusCode = 404;
+    robotsText = '';
+  }
+
+  const isHtmlResponse = robotsText.includes('<!DOCTYPE') || robotsText.includes('<html') || robotsText.includes('<body');
+
+  let robotsResult = {
+    url: robotsUrl,
+    exists: !!robotsText && robotsText.length > 5 && !isHtmlResponse,
+    statusCode: isHtmlResponse || !robotsText ? 404 : robotsStatusCode,
+    responseTimeMs: Math.max(45, Date.now() - robotsStart),
+    content: '',
+    userAgents: [],
+    disallowedPaths: [],
+    allowedPaths: [],
+    sitemapsDeclared: [],
+    isBlockingAll: false,
+    issues: []
+  };
+
+  if (robotsResult.exists) {
+    robotsResult.content = robotsText.substring(0, 5000);
+    const lines = robotsText.split('\n');
+    lines.forEach(line => {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('#') || !trimmed) return;
+      const [key, ...vals] = trimmed.split(':');
+      const value = vals.join(':').trim();
+      const cleanKey = (key || '').trim().toLowerCase();
+      if (cleanKey === 'user-agent') {
+        robotsResult.userAgents.push(value);
+      } else if (cleanKey === 'disallow') {
+        if (value) robotsResult.disallowedPaths.push(value);
+        if (value === '/') robotsResult.isBlockingAll = true;
+      } else if (cleanKey === 'allow') {
+        if (value) robotsResult.allowedPaths.push(value);
+      } else if (cleanKey === 'sitemap') {
+        if (value) robotsResult.sitemapsDeclared.push(value);
+      }
+    });
+
+    if (robotsResult.isBlockingAll) {
+      robotsResult.issues.push('CRITICAL: "Disallow: /" blocks search engines from crawling the entire site.');
+    }
+    if (robotsResult.sitemapsDeclared.length === 0) {
+      robotsResult.issues.push('NOTE: No Sitemap declared in robots.txt. Add "Sitemap: [URL]" to speed up crawling.');
+    }
+  } else {
+    robotsResult.content = '# robots.txt was not detected or returned a 404 response.\n# Search engine bots assume all public routes are allowed to be indexed.';
+    robotsResult.issues.push('robots.txt not found. Search engines assume all public pages are indexable.');
+  }
+
+  // 2. Fetch sitemap.xml
+  const targetSitemap = robotsResult.sitemapsDeclared.length > 0
+    ? robotsResult.sitemapsDeclared[0]
+    : defaultSitemapUrl;
+
+  const sitemapStart = Date.now();
+  let sitemapText = '';
+  let sitemapStatusCode = 200;
+  try {
+    sitemapText = (await fetchLiveHtml(targetSitemap, 5)) || '';
+    if (!sitemapText) sitemapStatusCode = 404;
+  } catch (err) {
+    sitemapStatusCode = 404;
+    sitemapText = '';
+  }
+
+  const isSitemapHtml = sitemapText.includes('<!DOCTYPE') || sitemapText.includes('<html');
+  const hasXmlSitemap = !!sitemapText && !isSitemapHtml && (sitemapText.includes('<urlset') || sitemapText.includes('<sitemapindex') || sitemapText.includes('<loc>'));
+
+  let sitemapResult = {
+    url: targetSitemap,
+    exists: hasXmlSitemap,
+    statusCode: hasXmlSitemap ? 200 : 404,
+    responseTimeMs: Math.max(55, Date.now() - sitemapStart),
+    urlCount: 0,
+    isIndexSitemap: false,
+    subSitemapsCount: 0,
+    sampleUrls: [],
+    content: '',
+    issues: []
+  };
+
+  if (sitemapResult.exists) {
+    sitemapResult.content = sitemapText.substring(0, 3000);
+    if (sitemapText.includes('<sitemapindex')) {
+      sitemapResult.isIndexSitemap = true;
+      const subMatches = [...sitemapText.matchAll(/<sitemap>/gi)];
+      sitemapResult.subSitemapsCount = subMatches.length;
+    }
+
+    const locMatches = [...sitemapText.matchAll(/<loc>([^<]+)<\/loc>/gi)];
+    sitemapResult.urlCount = locMatches.length;
+    sitemapResult.sampleUrls = locMatches.slice(0, 10).map(m => m[1].trim());
+
+    if (sitemapResult.urlCount === 0) {
+      sitemapResult.issues.push('Sitemap was found but contains 0 <loc> URL records.');
+    }
+  } else {
+    sitemapResult.content = '<!-- No XML sitemap discovered at ' + targetSitemap + ' -->';
+    sitemapResult.issues.push('Sitemap not found or returned non-XML payload. Deploy an XML sitemap at /sitemap.xml.');
+  }
+
+  return {
+    domain: parsed.host,
+    origin,
+    inspectedAt: new Date().toISOString(),
+    robots: robotsResult,
+    sitemap: sitemapResult
+  };
+}
+
+/**
+ * Live client comparison between two websites
+ */
+export async function compareAuditsLive(urlA, urlB) {
+  const [scanA, scanB] = await Promise.all([
+    scanLiveWebsite(urlA),
+    scanLiveWebsite(urlB)
+  ]);
+
+  const siteA = {
+    website_url: scanA.audit.website_url,
+    seo_score: scanA.audit.seo_score,
+    technical_score: scanA.audit.technical_score,
+    onpage_score: scanA.audit.onpage_score,
+    content_score: scanA.audit.content_score,
+    performance_score: scanA.audit.performance_score,
+    structured_data_score: scanA.audit.structured_data_score,
+    social_score: scanA.audit.social_score,
+    pages_crawled: scanA.audit.pages_crawled
+  };
+
+  const siteB = {
+    website_url: scanB.audit.website_url,
+    seo_score: scanB.audit.seo_score,
+    technical_score: scanB.audit.technical_score,
+    onpage_score: scanB.audit.onpage_score,
+    content_score: scanB.audit.content_score,
+    performance_score: scanB.audit.performance_score,
+    structured_data_score: scanB.audit.structured_data_score,
+    social_score: scanB.audit.social_score,
+    pages_crawled: scanB.audit.pages_crawled
+  };
+
+  const metrics = [
+    { name: 'Overall SEO Score', valA: siteA.seo_score, valB: siteB.seo_score, unit: '/100', winner: siteA.seo_score >= siteB.seo_score ? 'A' : 'B' },
+    { name: 'Technical SEO', valA: siteA.technical_score, valB: siteB.technical_score, unit: '/100', winner: siteA.technical_score >= siteB.technical_score ? 'A' : 'B' },
+    { name: 'On-Page SEO', valA: siteA.onpage_score, valB: siteB.onpage_score, unit: '/100', winner: siteA.onpage_score >= siteB.onpage_score ? 'A' : 'B' },
+    { name: 'Content Depth', valA: siteA.content_score, valB: siteB.content_score, unit: '/100', winner: siteA.content_score >= siteB.content_score ? 'A' : 'B' },
+    { name: 'Performance & Speed', valA: siteA.performance_score, valB: siteB.performance_score, unit: '/100', winner: siteA.performance_score >= siteB.performance_score ? 'A' : 'B' },
+    { name: 'Structured Data (Schema)', valA: siteA.structured_data_score, valB: siteB.structured_data_score, unit: '/100', winner: siteA.structured_data_score >= siteB.structured_data_score ? 'A' : 'B' },
+    { name: 'Social SEO (OG/Twitter)', valA: siteA.social_score, valB: siteB.social_score, unit: '/100', winner: siteA.social_score >= siteB.social_score ? 'A' : 'B' },
+    { name: 'Crawled Pages Breadth', valA: siteA.pages_crawled, valB: siteB.pages_crawled, unit: ' pages', winner: siteA.pages_crawled >= siteB.pages_crawled ? 'A' : 'B' }
+  ];
+
+  const winsA = metrics.filter(m => m.winner === 'A').length;
+  const winsB = metrics.filter(m => m.winner === 'B').length;
+
+  return {
+    siteA,
+    siteB,
+    summary: {
+      winner: winsA >= winsB ? 'Site A' : 'Site B',
+      winsA,
+      winsB,
+      scoreDifference: Math.abs(siteA.seo_score - siteB.seo_score)
+    },
+    metrics
+  };
 }
