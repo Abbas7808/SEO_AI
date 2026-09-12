@@ -86,19 +86,30 @@ export default function DashboardLayout() {
             <Outlet />
           </ErrorBoundary>
         </main>
-        {/* Dashboard Footer with Developer Attribution */}
+        {/* Dashboard Footer with Powered by Nextsoft */}
         <footer className="border-t border-slate-200 dark:border-slate-800/80 bg-white/50 dark:bg-slate-900/50 py-4 px-6 text-xs text-slate-500 dark:text-slate-400 flex flex-col sm:flex-row items-center justify-between gap-3">
           <span>© {new Date().getFullYear()} siteglow-ai &bull; Autonomous SEO Platform</span>
-          <div className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-300">
-            <span>Developed By</span>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-300">
+              <span>Powered by</span>
+              <a
+                href="https://nexsoft.site/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 font-black hover:underline transition-all bg-brand-50 dark:bg-brand-950/60 px-2.5 py-1 rounded border border-brand-200 dark:border-brand-900 shadow-xs"
+              >
+                <span>Nextsoft</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
+            <span className="text-slate-300 dark:text-slate-700">&bull;</span>
             <a
               href="https://www.linkedin.com/in/munim-abbas"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 font-extrabold hover:underline transition-all bg-brand-50 dark:bg-brand-950/60 px-2 py-0.5 rounded border border-brand-200 dark:border-brand-900"
+              className="text-slate-500 hover:text-brand-600 dark:hover:text-brand-400 transition-colors"
             >
-              <span>Munim Abbas</span>
-              <ExternalLink className="w-3 h-3" />
+              Dev: Munim Abbas
             </a>
           </div>
         </footer>

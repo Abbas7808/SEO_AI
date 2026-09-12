@@ -66,24 +66,32 @@ export default function Footer() {
         <div className="pt-8 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 dark:text-slate-400 gap-4">
           <p>© {new Date().getFullYear()} siteglow-ai. All rights reserved.</p>
 
-          {/* Developer Attribution with LinkedIn Link */}
+          {/* Powered by Nextsoft */}
           <div className="flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-300">
-            <span>Developed By</span>
+            <span>Powered by</span>
+            <a
+              href="https://nexsoft.site/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 font-black hover:underline transition-all bg-brand-50 dark:bg-brand-950/60 px-3 py-1 rounded-md border border-brand-200 dark:border-brand-900 shadow-xs"
+            >
+              <span>Nextsoft</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          </div>
+
+          <div className="flex items-center gap-4">
             <a
               href="https://www.linkedin.com/in/munim-abbas"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 font-extrabold hover:underline transition-all bg-brand-50 dark:bg-brand-950/60 px-2.5 py-1 rounded-md border border-brand-200 dark:border-brand-900"
+              className="text-slate-500 hover:text-brand-600 dark:hover:text-brand-400 transition-colors"
             >
-              <span>Munim Abbas</span>
-              <ExternalLink className="w-3 h-3" />
+              Dev: Munim Abbas
             </a>
-          </div>
-
-          <div className="flex items-center gap-6">
             <span className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              All Systems Operational
+              Operational
             </span>
           </div>
         </div>
