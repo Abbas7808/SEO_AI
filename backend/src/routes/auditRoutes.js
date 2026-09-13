@@ -6,6 +6,9 @@ const { optionalAuth, requireAuth } = require('../middleware/authMiddleware');
 router.post('/', optionalAuth, auditController.createAudit);
 router.get('/', optionalAuth, auditController.getAudits);
 
+// ── Real-time SSE Audit Stream (live progress during scan) ──
+router.get('/stream', optionalAuth, auditController.streamAudit);
+
 // Advanced Unique SEO Services
 router.post('/inspect-site', optionalAuth, auditController.inspectSite);
 router.post('/compare', optionalAuth, auditController.compareAudits);
@@ -34,3 +37,4 @@ router.post('/:id/antigravity/resolve-issue', optionalAuth, auditController.reso
 router.get('/:id/antigravity/download-patch', optionalAuth, auditController.downloadAntigravityPatch);
 
 module.exports = router;
+

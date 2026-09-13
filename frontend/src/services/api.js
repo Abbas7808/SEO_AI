@@ -130,7 +130,57 @@ export const auditApi = {
     clearApiCache();
     return api.post('/audits/antigravity/batch-apply-local-fixes', data);
   },
+
+  /**
+   * SSE-based real-time audit stream.
+   * @param {object} params  { url, maxPages, targetKeyword, businessName, businessLocation }
+   * @param {object} cbs     { onProgress, onComplete, onError }
+   * @returns {EventSource}  Call .close() to cancel early.
+   */
+  streamAudit(params, { onProgress, onComplete, onError } = {}) {
+    const base = import.meta.env.VITE_API_URL
+      ? import.meta.env.VITE_API_URL.replace(/\/$/, '')
+      : '';
+    const qs = new URLSearchParams(
+      Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== ''))
+    ).toString();
+    const sseUrl = `${base}/api/audits/stream?${qs}`;
+
+    // Attach JWT in URL param as SSE headers are not directly settable
+    const token = localStorage.getItem('seo_token');
+    const finalUrl = token ? `${sseUrl}&token=${encodeURIComponent(token)}` : sseUrl;
+
+    const es = new EventSource(finalUrl);
+    es.addEventListener('progress', (e) => {
+      try { onProgress && onProgress(JSON.parse(e.data)); } catch { }
+    });
+    es.addEventListener('complete', (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        onComplete && onComplete(data);
+        clearApiCache(); // invalidate cache so fresh result shows
+      } catch { }
+      es.close();
+    });
+    es.addEventListener('error', (e) => {
+      try {
+        const data = e.data ? JSON.parse(e.data) : { message: 'Connection error' };
+        onError && onError(data);
+      } catch {
+        onError && onError({ message: 'Stream connection error' });
+      }
+      es.close();
+    });
+    es.onerror = (e) => {
+      // Only fire if readyState is CLOSED (not normal reconnect attempt)
+      if (es.readyState === EventSource.CLOSED) {
+        onError && onError({ message: 'Stream connection lost' });
+      }
+    };
+    return es;
+  },
 };
+
 
 export const aiApi = {
   analyze: (data) => api.post('/ai/analyze', data),

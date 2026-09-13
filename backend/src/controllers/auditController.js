@@ -1197,7 +1197,7 @@ const auditController = {
               replacementCode,
               originalCode
             });
-            results.push({ issueId: fix.issueId || fix.id, success: true, patchRes });
+          results.push({ issueId: fix.issueId || fix.id, success: true, patchRes });
 
             if (fix.issueId || fix.id) {
               await issueModel.updateStatus(fix.issueId || fix.id, 'resolved');
@@ -1230,7 +1230,204 @@ const auditController = {
       logger.error(`Error in batchApplyLocalFixes: ${error.message}`);
       res.status(500).json({ success: false, message: error.message });
     }
+  },
+
+  /**
+   * ── Real-Time SSE Audit Stream ──
+   * GET /api/audits/stream?url=<website>&maxPages=<n>&targetKeyword=<kw>
+   *
+   * Sends Server-Sent Events with live progress:
+   *   event: progress  → crawling / analysis stages
+   *   event: complete  → final audit result (full JSON)
+   *   event: error     → error message
+   *
+   * The client uses EventSource to receive these in real time.
+   */
+  async streamAudit(req, res, next) {
+    const { url, websiteUrl, maxPages = 20, targetKeyword, businessName, businessLocation } = req.query;
+    const targetSiteUrl = websiteUrl || url;
+
+    // ── SSE Setup ──
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // disable Nginx buffering
+    res.flushHeaders();
+
+    const send = (event, data) => {
+      try {
+        res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+        if (res.flush) res.flush(); // express-compression compat
+      } catch { /* client disconnected */ }
+    };
+
+    const heartbeat = setInterval(() => {
+      try { res.write(': heartbeat\n\n'); } catch { clearInterval(heartbeat); }
+    }, 15000);
+
+    const done = () => {
+      clearInterval(heartbeat);
+      try { res.end(); } catch {}
+    };
+
+    try {
+      // 1. Validate URL
+      send('progress', { stage: 'validating', percent: 2, message: '🔍 Validating URL...' });
+      const validatedUrl = await validateAuditUrl(targetSiteUrl);
+      const parsedMaxPages = Math.min(Math.max(parseInt(maxPages, 10) || 20, 1), 50);
+
+      // 2. Create DB record
+      const userId = req.user ? req.user.id : null;
+      const auditId = await auditModel.create({
+        userId,
+        websiteUrl: validatedUrl,
+        maxPages: parsedMaxPages,
+        targetKeyword: targetKeyword ? String(targetKeyword).trim() : null,
+        businessName: businessName ? String(businessName).trim() : null,
+        businessLocation: businessLocation ? String(businessLocation).trim() : null
+      });
+
+      send('progress', { stage: 'started', auditId, percent: 5, message: `🚀 Audit #${auditId} started — initializing parallel crawler...` });
+      await auditModel.updateStatus(auditId, 'crawling');
+
+      // 3. Parallel crawl with live progress callbacks
+      const crawler = new CrawlerService({
+        maxPages: parsedMaxPages,
+        timeout: 10000,
+        concurrency: 5
+      });
+
+      let lastPercent = 5;
+      const crawlResult = await crawler.crawl(validatedUrl, (progress) => {
+        const crawledFraction = Math.min(progress.crawledCount / parsedMaxPages, 1);
+        const percent = Math.round(5 + crawledFraction * 45); // 5–50% for crawling
+        if (percent > lastPercent) {
+          lastPercent = percent;
+          send('progress', { ...progress, percent, stage: 'crawling' });
+        }
+      });
+
+      send('progress', {
+        stage: 'crawl_done',
+        percent: 52,
+        totalCrawled: crawlResult.totalCrawled,
+        batchCount: crawlResult.batchCount,
+        message: `✅ Crawled ${crawlResult.totalCrawled} pages in ${crawlResult.batchCount} parallel batches`
+      });
+
+      // 4. SEO Analysis
+      await auditModel.updateStatus(auditId, 'analyzing');
+      send('progress', { stage: 'analyzing', percent: 55, message: '🧠 Running AI-powered SEO analysis engine...' });
+
+      const context = {
+        websiteUrl: validatedUrl,
+        targetKeyword: targetKeyword ? String(targetKeyword).trim() : '',
+        businessName: businessName ? String(businessName).trim() : '',
+        businessLocation: businessLocation ? String(businessLocation).trim() : ''
+      };
+      const { analyzedPages, scoreResult, roadmap, backlinkProfile } = SeoEngine.analyzeAndScore(crawlResult.pages, context);
+
+      send('progress', { stage: 'scored', percent: 65, score: scoreResult.overallScore, message: `📊 SEO Score calculated: ${scoreResult.overallScore}/100` });
+
+      // 5. Persist pages
+      send('progress', { stage: 'saving', percent: 68, message: '💾 Saving page data to database...' });
+      const pageIdMap = new Map();
+      for (const page of analyzedPages) {
+        const pageId = await pageModel.create({
+          auditId, url: page.url, statusCode: page.statusCode,
+          title: page.onPage.title, metaDescription: page.onPage.metaDescription,
+          canonicalUrl: page.technical.canonicalTag, h1Count: page.onPage.h1Count,
+          wordCount: page.content.wordCount, imageCount: page.images.total,
+          internalLinkCount: page.links.internalCount, externalLinkCount: page.links.externalCount,
+          seoScore: page.pageOverall || scoreResult.overallScore, loadTimeMs: page.performance.responseTimeMs,
+          contentDetails: {
+            headings: { h1: page.onPage.h1s, h2: page.onPage.h2s, h3: page.onPage.h3s },
+            imagesWithoutAlt: page.images.missingAltCount,
+            imagesWithoutDimensions: page.images.missingDimensionsCount || 0,
+            schemas: page.structuredData.schemas, schemaDetails: page.structuredData.details || [],
+            social: page.social, anchors: page.links.anchors,
+            performance: page.performance, security: page.security,
+            techStack: page.techStack, searchIntent: page.searchIntent,
+            serpSimulator: page.serpSimulator, linkEquity: page.linkEquity
+          }
+        });
+        pageIdMap.set(page.url, pageId);
+      }
+
+      // 6. Persist issues
+      send('progress', { stage: 'issues', percent: 75, message: `🐛 Detected ${scoreResult.issues?.length || 0} SEO issues — saving...` });
+      if (scoreResult.issues && scoreResult.issues.length > 0) {
+        await issueModel.createMany(scoreResult.issues.map(issue => ({
+          auditId, pageId: pageIdMap.get(issue.page) || null,
+          issueType: issue.type, category: issue.category || 'technical',
+          severity: issue.severity, title: issue.title, description: issue.description,
+          impact: issue.impact, recommendation: issue.recommendation,
+          suggestedFix: issue.suggestedFix || issue.suggested_fix || null,
+          solutionSteps: issue.solutionSteps ? JSON.stringify(issue.solutionSteps) : null,
+          pageUrl: issue.page, status: 'open'
+        })));
+      }
+
+      // 7. Antigravity blueprint
+      send('progress', { stage: 'blueprint', percent: 80, message: '⚡ Generating Antigravity repair blueprint...' });
+      let antigravityBlueprint = null;
+      try {
+        antigravityBlueprint = antigravityEngine.batchRepairAll({ auditId, websiteUrl: validatedUrl, issues: scoreResult.issues });
+      } catch (agErr) {
+        logger.warn(`Blueprint error: ${agErr.message}`);
+      }
+
+      // 8. AI Summary
+      send('progress', { stage: 'ai_summary', percent: 88, message: '🤖 Generating AI recommendations and strategic roadmap...' });
+      let aiSummaryJson = null;
+      try {
+        const aiSummary = await aiService.generateAuditSummary({
+          websiteUrl: validatedUrl, overallScore: scoreResult.overallScore,
+          mobileScore: scoreResult.mobileScore, desktopScore: scoreResult.desktopScore,
+          technicalScore: scoreResult.technicalScore, onPageScore: scoreResult.onPageScore,
+          contentScore: scoreResult.contentScore, performanceScore: scoreResult.performanceScore,
+          structuredDataScore: scoreResult.structuredDataScore, socialScore: scoreResult.socialScore,
+          localScore: scoreResult.localScore, issues: scoreResult.issues
+        });
+        aiSummary.roadmap = roadmap;
+        aiSummary.backlinkProfile = backlinkProfile;
+        aiSummary.antigravityBlueprint = antigravityBlueprint;
+        aiSummaryJson = JSON.stringify(aiSummary);
+      } catch (aiErr) {
+        logger.warn(`AI summary note: ${aiErr.message}`);
+        aiSummaryJson = JSON.stringify({ roadmap, backlinkProfile, antigravityBlueprint });
+      }
+
+      // 9. Finalize in DB
+      send('progress', { stage: 'finalizing', percent: 96, message: '🏁 Finalizing audit results...' });
+      await auditModel.updateScores(auditId, {
+        seoScore: scoreResult.overallScore, mobileScore: scoreResult.mobileScore,
+        desktopScore: scoreResult.desktopScore, technicalScore: scoreResult.technicalScore,
+        onpageScore: scoreResult.onPageScore, contentScore: scoreResult.contentScore,
+        performanceScore: scoreResult.performanceScore, structuredDataScore: scoreResult.structuredDataScore,
+        socialScore: scoreResult.socialScore, localScore: scoreResult.localScore,
+        pagesCrawled: crawlResult.totalCrawled, aiSummary: aiSummaryJson
+      });
+      await auditModel.updateStatus(auditId, 'completed');
+      const completedAudit = await auditModel.findById(auditId);
+
+      // 10. Emit final complete event with full result
+      send('complete', {
+        stage: 'complete',
+        percent: 100,
+        message: `🎉 Audit complete! SEO Score: ${scoreResult.overallScore}/100`,
+        data: { audit: completedAudit, scoreResult, roadmap, backlinkProfile, antigravityBlueprint }
+      });
+
+      logger.info(`[StreamAudit] Audit #${auditId} completed. Score: ${scoreResult.overallScore}/100`);
+    } catch (error) {
+      logger.error(`[StreamAudit] Error: ${error.message}`);
+      send('error', { message: error.message || 'Audit failed. Please try again.' });
+    } finally {
+      done();
+    }
   }
 };
 
 module.exports = auditController;
+

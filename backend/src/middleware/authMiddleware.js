@@ -35,9 +35,18 @@ async function requireAuth(req, res, next) {
 
 async function optionalAuth(req, res, next) {
   try {
+    // Check Authorization header first, then fall back to ?token= query param
+    // (SSE/EventSource cannot set custom headers, so token must be in URL)
     const authHeader = req.headers.authorization;
+    let token = null;
+
     if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.split(' ')[1];
+      token = authHeader.split(' ')[1];
+    } else if (req.query.token) {
+      token = req.query.token;
+    }
+
+    if (token) {
       const decoded = jwt.verify(token, config.jwt.secret);
       const users = await db.query('SELECT id, name, email, created_at FROM users WHERE id = ?', [decoded.id]);
       if (users.length > 0) {

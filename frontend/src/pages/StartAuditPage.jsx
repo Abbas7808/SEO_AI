@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Globe,
@@ -19,10 +19,10 @@ import {
   Bot,
   FileCheck,
   Layers,
-  Code2
+  Code2,
+  X
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
-import { scanLiveWebsite } from '../services/liveScanner';
 import { auditApi } from '../services/api';
 import { getUserPlan, getTrialUsage, canPerformAudit } from '../utils/planLimits';
 import TrialLimitModal from '../components/common/TrialLimitModal';
@@ -113,7 +113,22 @@ export default function StartAuditPage() {
     handleValidatePath(defaultWs);
   };
 
-  const handleSubmit = async (e) => {
+  // SSE connection ref so we can cancel it on unmount
+  const sseRef = useRef(null);
+
+  // Cleanup SSE on unmount
+  useEffect(() => {
+    return () => { if (sseRef.current) sseRef.current.close(); };
+  }, []);
+
+  const handleCancelScan = () => {
+    if (sseRef.current) { sseRef.current.close(); sseRef.current = null; }
+    setLoading(false);
+    setAuditProgress(null);
+    setError('Scan cancelled.');
+  };
+
+  const handleSubmit = (e) => {
     e.preventDefault();
 
     // Check if user has exceeded their free trial audits
@@ -130,94 +145,50 @@ export default function StartAuditPage() {
 
     setError('');
     setLoading(true);
+    setAuditProgress({ percent: 2, stage: 'connecting', message: '🔗 Connecting to scan engine...' });
 
-    const hasLocalPath = Boolean(projectPath && projectPath.trim());
-    const activeSteps = getAuditSteps(hasLocalPath);
-    setAuditProgress({ stepIndex: 0, percent: 5, currentStep: activeSteps[0] });
+    // Close any existing SSE stream
+    if (sseRef.current) sseRef.current.close();
 
-    try {
-      // 1. Perform live website crawl & analysis
-      let liveScanResult = null;
-      try {
-        liveScanResult = await scanLiveWebsite(websiteUrl.trim(), {
-          targetKeyword: targetKeyword.trim(),
-          businessName: businessName.trim(),
-          businessLocation: businessLocation.trim(),
-        });
-      } catch (liveErr) {
-        if (!hasLocalPath) {
-          throw liveErr;
-        }
-        console.warn('Live website direct scan warning:', liveErr.message);
-      }
-
-      let auditId = liveScanResult?.audit?.id || 1;
-
-      // 2. If local codebase path is provided, also scan source code with AST analyzer
-      if (hasLocalPath) {
-        const scanResult = await auditApi.scanLocalProject({
-          projectPath: projectPath.trim(),
-          websiteUrl: websiteUrl.trim(),
-          targetKeyword: targetKeyword.trim(),
-          businessName: businessName.trim(),
-          businessLocation: businessLocation.trim()
-        });
-
-        const audit = scanResult.data?.audit;
-        if (audit?.id) {
-          auditId = audit.id;
-        }
-
-        // Store unified live and local data into localStorage
-        try {
-          const unifiedAudit = {
-            ...(liveScanResult?.audit || {}),
-            ...(audit || {}),
-            website_url: websiteUrl.trim(),
-            project_path: projectPath.trim(),
-            scan_mode: 'local'
-          };
-          localStorage.setItem(`seo_current_audit_${auditId}`, JSON.stringify(unifiedAudit));
-
-          const issuesList = (scanResult.data?.scoreResult?.issues && scanResult.data.scoreResult.issues.length > 0)
-            ? scanResult.data.scoreResult.issues
-            : (liveScanResult?.issues || []);
-          localStorage.setItem(`seo_issues_${auditId}`, JSON.stringify(issuesList));
-
-          if (liveScanResult?.siteIntelligence) {
-            localStorage.setItem(`seo_site_intel_${auditId}`, JSON.stringify(liveScanResult.siteIntelligence));
+    const es = auditApi.streamAudit(
+      {
+        url: websiteUrl.trim(),
+        maxPages,
+        targetKeyword: targetKeyword.trim() || undefined,
+        businessName: businessName.trim() || undefined,
+        businessLocation: businessLocation.trim() || undefined,
+      },
+      {
+        onProgress: (progress) => {
+          setAuditProgress(progress);
+        },
+        onComplete: (result) => {
+          sseRef.current = null;
+          setLoading(false);
+          const auditId = result?.data?.audit?.id;
+          // Cache full result in localStorage for instant dashboard load
+          if (auditId) {
+            try {
+              localStorage.setItem('seo_latest_audit_id', auditId);
+              if (result.data?.scoreResult?.issues) {
+                localStorage.setItem(`seo_issues_${auditId}`, JSON.stringify(result.data.scoreResult.issues));
+              }
+            } catch (_) {}
           }
-          if (liveScanResult?.backlitData) {
-            localStorage.setItem(`seo_backlit_${auditId}`, JSON.stringify(liveScanResult.backlitData));
-          }
-          if (liveScanResult?.primaryPage) {
-            localStorage.setItem(`seo_pages_${auditId}`, JSON.stringify([liveScanResult.primaryPage]));
-          }
-
-          localStorage.setItem('seo_latest_audit_id', auditId);
-        } catch (e) {
-          console.warn('LocalStorage synchronization warning:', e);
-        }
+          setAuditProgress({ percent: 100, stage: 'complete', message: result.message || '🎉 Scan complete!' });
+          setTimeout(() => {
+            navigate(auditId ? `/dashboard/issues?auditId=${auditId}` : '/dashboard');
+          }, 800);
+        },
+        onError: (err) => {
+          sseRef.current = null;
+          setLoading(false);
+          setAuditProgress(null);
+          setError(err?.message || 'Scan failed. Please check the URL and try again.');
+        },
       }
-
-      // Animate step progress simulation for UI feedback
-      for (let i = 0; i < activeSteps.length; i++) {
-        await new Promise((r) => setTimeout(r, 320));
-        setAuditProgress({
-          stepIndex: i,
-          percent: Math.round(((i + 1) / activeSteps.length) * 100),
-          currentStep: activeSteps[i],
-        });
-      }
-
-      await new Promise((r) => setTimeout(r, 300));
-      navigate(`/dashboard/issues?auditId=${auditId}`);
-    } catch (err) {
-      setError(err.message || 'Failed to complete audit. Please verify the URL.');
-      setAuditProgress(null);
-    } finally {
-      setLoading(false);
-    }
+    );
+    sseRef.current = es;
   };
 
   const hasLocalPath = Boolean(projectPath && projectPath.trim());
@@ -304,63 +275,134 @@ export default function StartAuditPage() {
         </div>
       )}
 
-      {/* Progress Overlay */}
+      {/* ─── Real-Time SSE Scan Progress ─── */}
       {auditProgress && (
-        <div className="p-6 sm:p-8 rounded-2xl bg-white dark:bg-slate-900 border-2 border-brand-500 shadow-2xl space-y-6 animate-scale-up">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <Loader2 className="w-5 h-5 text-brand-600 animate-spin" />
+        <div className="p-6 sm:p-8 rounded-2xl bg-white dark:bg-slate-900 border-2 border-brand-500/60 shadow-2xl shadow-brand-500/10 space-y-5 animate-scale-up">
+          {/* Header */}
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3">
+              {auditProgress.stage === 'complete' ? (
+                <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
+              ) : (
+                <Loader2 className="w-5 h-5 text-brand-600 animate-spin shrink-0" />
+              )}
               <div>
-                <span className="font-bold text-slate-900 dark:text-white block">
-                  Auditing {websiteUrl}
-                </span>
-                <span className="text-xs text-slate-500">
-                  {hasLocalPath ? `Live Network Crawl + Codebase AST Analysis (${projectPath})` : 'Live Server Crawl & Technical SEO Analysis'}
-                </span>
+                <p className="font-bold text-slate-900 dark:text-white text-sm leading-tight">
+                  {auditProgress.stage === 'complete' ? '✅ Audit Complete!' : `Scanning: ${websiteUrl}`}
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  {auditProgress.stage === 'crawling'
+                    ? `🕷️ Parallel batch crawl — up to 5 pages at once`
+                    : auditProgress.stage === 'analyzing'
+                    ? '🧠 AI SEO analysis engine running...'
+                    : auditProgress.stage === 'complete'
+                    ? 'Redirecting to results...'
+                    : 'Real-time scan in progress'}
+                </p>
               </div>
             </div>
-            <span className="text-sm font-extrabold text-brand-600 dark:text-brand-400 font-mono">
-              {auditProgress.percent}%
-            </span>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-lg font-extrabold text-brand-600 dark:text-brand-400 font-mono tabular-nums">
+                {auditProgress.percent}%
+              </span>
+              {auditProgress.stage !== 'complete' && (
+                <button
+                  type="button"
+                  onClick={handleCancelScan}
+                  title="Cancel scan"
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
           </div>
 
-          {/* Progress bar */}
-          <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-3 overflow-hidden">
+          {/* Progress bar with gradient glow */}
+          <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-3 overflow-hidden relative">
             <div
-              className="bg-gradient-to-r from-brand-600 to-indigo-600 h-3 rounded-full transition-all duration-300"
-              style={{ width: `${auditProgress.percent}%` }}
+              className="h-3 rounded-full transition-all duration-500 ease-out"
+              style={{
+                width: `${auditProgress.percent}%`,
+                background: auditProgress.stage === 'complete'
+                  ? 'linear-gradient(90deg, #10b981, #059669)'
+                  : 'linear-gradient(90deg, #6366f1, #8b5cf6, #ec4899)',
+                boxShadow: '0 0 10px rgba(99,102,241,0.5)'
+              }}
             />
           </div>
 
-          <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800 max-h-64 overflow-y-auto pr-1">
-            {activeSteps.map((step, idx) => {
-              const isDone = idx < auditProgress.stepIndex;
-              const isCurrent = idx === auditProgress.stepIndex;
+          {/* Live message from server */}
+          <div className="flex items-center gap-2 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+            <span className="text-lg leading-none">{
+              auditProgress.stage === 'complete' ? '🎉' :
+              auditProgress.stage === 'crawling' ? '🕷️' :
+              auditProgress.stage === 'crawl_done' ? '✅' :
+              auditProgress.stage === 'analyzing' ? '🧠' :
+              auditProgress.stage === 'scored' ? '📊' :
+              auditProgress.stage === 'saving' ? '💾' :
+              auditProgress.stage === 'issues' ? '🐛' :
+              auditProgress.stage === 'blueprint' ? '⚡' :
+              auditProgress.stage === 'ai_summary' ? '🤖' :
+              auditProgress.stage === 'finalizing' ? '🏁' :
+              '🔍'
+            }</span>
+            <p className="text-sm font-medium text-slate-700 dark:text-slate-300 leading-snug">
+              {auditProgress.message || 'Processing...'}
+            </p>
+          </div>
+
+          {/* Stage badges */}
+          <div className="flex flex-wrap gap-1.5 text-[10px] font-bold">
+            {[
+              { key: 'validating', label: 'Validate' },
+              { key: 'crawling', label: 'Crawl' },
+              { key: 'analyzing', label: 'Analyze' },
+              { key: 'scored', label: 'Score' },
+              { key: 'saving', label: 'Save' },
+              { key: 'blueprint', label: 'Blueprint' },
+              { key: 'ai_summary', label: 'AI' },
+              { key: 'complete', label: 'Done' },
+            ].map(({ key, label }) => {
+              const stageOrder = ['validating','started','crawling','crawl_done','analyzing','scored','saving','issues','blueprint','ai_summary','finalizing','complete'];
+              const currentIdx = stageOrder.indexOf(auditProgress.stage);
+              const thisIdx = stageOrder.indexOf(key);
+              const isDone = thisIdx < currentIdx || auditProgress.stage === 'complete';
+              const isCurrent = thisIdx === currentIdx || (key === 'crawling' && auditProgress.stage === 'crawl_done');
               return (
-                <div
-                  key={idx}
-                  className={`flex items-center gap-2.5 text-xs transition-colors ${
+                <span
+                  key={key}
+                  className={`px-2 py-0.5 rounded-full border transition-all ${
                     isDone
-                      ? 'text-emerald-600 dark:text-emerald-400 font-medium'
+                      ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-600 dark:text-emerald-400'
                       : isCurrent
-                      ? 'text-brand-600 dark:text-brand-400 font-bold'
-                      : 'text-slate-400 dark:text-slate-600 opacity-60'
+                      ? 'bg-brand-500/20 border-brand-500/40 text-brand-600 dark:text-brand-400 animate-pulse'
+                      : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400'
                   }`}
                 >
-                  {isDone ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                  ) : isCurrent ? (
-                    <Loader2 className="w-4 h-4 animate-spin shrink-0" />
-                  ) : (
-                    <div className="w-4 h-4 rounded-full border border-slate-300 dark:border-slate-700 shrink-0" />
-                  )}
-                  <span>{step}</span>
-                </div>
+                  {isDone ? '✓ ' : isCurrent ? '● ' : ''}{label}
+                </span>
               );
             })}
           </div>
+
+          {/* Parallel crawler info */}
+          {(auditProgress.stage === 'crawling' || auditProgress.stage === 'batch_complete') && (
+            <div className="text-xs text-slate-500 dark:text-slate-400 flex flex-wrap gap-x-4 gap-y-1 border-t border-slate-200 dark:border-slate-800 pt-3">
+              {auditProgress.crawledCount !== undefined && (
+                <span>📄 Pages crawled: <strong className="text-slate-700 dark:text-slate-300">{auditProgress.crawledCount}/{auditProgress.maxPages}</strong></span>
+              )}
+              {auditProgress.batchNum !== undefined && (
+                <span>⚡ Batch: <strong className="text-slate-700 dark:text-slate-300">#{auditProgress.batchNum}</strong> ({auditProgress.batchSize} pages parallel)</span>
+              )}
+              {auditProgress.queueLength !== undefined && (
+                <span>🔗 Queued: <strong className="text-slate-700 dark:text-slate-300">{auditProgress.queueLength} URLs</strong></span>
+              )}
+            </div>
+          )}
         </div>
       )}
+
 
       {/* Main Configuration & Audit Form */}
       {!auditProgress && (
