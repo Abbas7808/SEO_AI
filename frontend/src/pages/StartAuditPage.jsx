@@ -15,15 +15,11 @@ import {
   Sparkles,
   Crown,
   Lock,
-  Laptop,
   FolderGit2,
   Bot,
-  HardDrive,
-  Terminal,
   FileCheck,
   Layers,
-  Wrench,
-  Check
+  Code2
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { scanLiveWebsite } from '../services/liveScanner';
@@ -43,19 +39,16 @@ export default function StartAuditPage() {
   const [showLimitModal, setShowLimitModal] = useState(false);
   const [limitReason, setLimitReason] = useState('trial_exceeded');
 
-  // Scanning mode: 'online' | 'local'
-  const [scanMode, setScanMode] = useState('online');
-
-  // Online inputs
+  // Unified audit inputs
   const [websiteUrl, setWebsiteUrl] = useState('');
+  const [projectPath, setProjectPath] = useState('');
   const [maxPages, setMaxPages] = useState(isPro ? 20 : 5);
 
-  // Local inputs
-  const [projectPath, setProjectPath] = useState('C:\\Users\\AGP KOHAT\\Desktop\\SEO');
+  // Local folder validation state
   const [validatingPath, setValidatingPath] = useState(false);
   const [pathValidation, setPathValidation] = useState(null);
 
-  // Shared inputs
+  // Optional SEO context inputs
   const [targetKeyword, setTargetKeyword] = useState('');
   const [businessName, setBusinessName] = useState('');
   const [businessLocation, setBusinessLocation] = useState('');
@@ -69,56 +62,40 @@ export default function StartAuditPage() {
     if (initialUrl) {
       setWebsiteUrl(decodeURIComponent(initialUrl));
     }
-    const initialMode = searchParams.get('mode');
-    if (initialMode === 'local') {
-      setScanMode('local');
-      if (!initialUrl) {
-        setWebsiteUrl('http://localhost:5173');
-      }
-    }
     const initialPath = searchParams.get('path');
     if (initialPath) {
       setProjectPath(decodeURIComponent(initialPath));
     }
   }, [searchParams]);
 
-  const onlineAuditSteps = [
+  const getAuditSteps = (hasLocalPath) => [
     'Validating live website & checking SSRF safety',
-    'Connecting to remote website host (SSL & DNS lookup)',
+    'Connecting to remote host (SSL handshake & DNS lookup)',
     'Measuring server response latency (TTFB) & status codes',
     'Auditing HTTP security headers (HSTS, CSP, X-Frame-Options)',
     'Inspecting robots.txt & XML sitemap indexability',
-    'Crawling discovered internal pages & link structure',
+    'Crawling internal pages & rendered DOM structure',
     'Checking on-page metadata, title tags & descriptions',
     'Evaluating mobile viewport responsiveness & typography',
     'Scanning images for missing alt attributes',
     'Checking Schema.org JSON-LD structured data',
-    'Calculating grounded 0-100 Technical & On-Page SEO score',
-    'Compiling remote technical diagnostics & recommendations',
+    ...(hasLocalPath ? [
+      'Indexing local project source files (.html, .jsx, .tsx, .vue)',
+      'Parsing AST components and mapping issues to exact line numbers',
+      'Synthesizing line-level code diffs for Google Antigravity IDE'
+    ] : []),
+    'Calculating grounded 0-100 SEO health score',
+    'Compiling actionable AI recommendations',
     'Audit complete!'
   ];
 
-  const localAuditSteps = [
-    'Connecting to live website / dev server & testing response latency',
-    'Validating local project directory & source permissions',
-    'Auditing live rendered DOM, meta tags & mobile viewport',
-    'Indexing codebase files (.html, .jsx, .tsx, .vue, .astro, .php)',
-    'Parsing document head, title tags & character lengths line-by-line',
-    'Auditing meta descriptions & mobile viewport tags in source code',
-    'Scanning image tags for missing alt attributes with exact lines',
-    'Evaluating H1-H6 heading hierarchy & code semantics',
-    'Calculating grounded 0-100 local codebase & live SEO score',
-    'Synthesizing line-level code diffs for Google Antigravity',
-    'Configuring Google Antigravity autonomous agent session',
-    'Dual audit complete! Ready to edit in Google Antigravity.'
-  ];
-
-  const handleValidatePath = async () => {
-    if (!projectPath.trim()) return;
+  const handleValidatePath = async (overridePath) => {
+    const pathToValidate = (overridePath || projectPath).trim();
+    if (!pathToValidate) return;
     setValidatingPath(true);
     setError('');
     try {
-      const res = await auditApi.validateLocalPath({ projectPath: projectPath.trim() });
+      const res = await auditApi.validateLocalPath({ projectPath: pathToValidate });
       if (res.data) {
         setPathValidation(res.data);
       }
@@ -128,6 +105,12 @@ export default function StartAuditPage() {
     } finally {
       setValidatingPath(false);
     }
+  };
+
+  const handleUseCurrentWorkspace = () => {
+    const defaultWs = 'C:\\Users\\AGP KOHAT\\Desktop\\SEO';
+    setProjectPath(defaultWs);
+    handleValidatePath(defaultWs);
   };
 
   const handleSubmit = async (e) => {
@@ -140,75 +123,38 @@ export default function StartAuditPage() {
       return;
     }
 
+    if (!websiteUrl.trim()) {
+      setError('Please provide a live website URL.');
+      return;
+    }
+
     setError('');
+    setLoading(true);
 
-    if (scanMode === 'online') {
-      if (!websiteUrl.trim()) {
-        setError('Please provide a live website URL.');
-        return;
-      }
+    const hasLocalPath = Boolean(projectPath && projectPath.trim());
+    const activeSteps = getAuditSteps(hasLocalPath);
+    setAuditProgress({ stepIndex: 0, percent: 5, currentStep: activeSteps[0] });
 
-      setLoading(true);
-      const activeSteps = onlineAuditSteps;
-      setAuditProgress({ stepIndex: 0, percent: 5, currentStep: activeSteps[0] });
-
+    try {
+      // 1. Perform live website crawl & analysis
+      let liveScanResult = null;
       try {
-        // Execute real live scan
-        const scanResult = await scanLiveWebsite(websiteUrl.trim(), {
+        liveScanResult = await scanLiveWebsite(websiteUrl.trim(), {
           targetKeyword: targetKeyword.trim(),
           businessName: businessName.trim(),
           businessLocation: businessLocation.trim(),
         });
-
-        const auditId = scanResult.audit.id;
-
-        // Animate step progress simulation for UI feedback
-        for (let i = 0; i < activeSteps.length; i++) {
-          await new Promise((r) => setTimeout(r, 350));
-          setAuditProgress({
-            stepIndex: i,
-            percent: Math.round(((i + 1) / activeSteps.length) * 100),
-            currentStep: activeSteps[i],
-          });
+      } catch (liveErr) {
+        if (!hasLocalPath) {
+          throw liveErr;
         }
-
-        await new Promise((r) => setTimeout(r, 300));
-        navigate(`/dashboard/issues?auditId=${auditId}`);
-      } catch (err) {
-        setError(err.message || 'Failed to start online audit. Please verify the URL.');
-        setAuditProgress(null);
-      } finally {
-        setLoading(false);
-      }
-    } else {
-      // Developer Mode: Local Codebase on PC + Live Website
-      if (!websiteUrl.trim()) {
-        setError('Please enter the live website URL (e.g. http://localhost:5173 or your live site).');
-        return;
-      }
-      if (!projectPath.trim()) {
-        setError('Please enter the project folder location on this PC.');
-        return;
+        console.warn('Live website direct scan warning:', liveErr.message);
       }
 
-      setLoading(true);
-      const activeSteps = localAuditSteps;
-      setAuditProgress({ stepIndex: 0, percent: 5, currentStep: activeSteps[0] });
+      let auditId = liveScanResult?.audit?.id || 1;
 
-      try {
-        // 1. Perform genuine live website scan (inspects live DOM, status codes, speed, headings, images, schemas)
-        let liveScanResult = null;
-        try {
-          liveScanResult = await scanLiveWebsite(websiteUrl.trim(), {
-            targetKeyword: targetKeyword.trim(),
-            businessName: businessName.trim(),
-            businessLocation: businessLocation.trim(),
-          });
-        } catch (liveErr) {
-          console.warn('Live website direct scan warning:', liveErr.message);
-        }
-
-        // 2. Call backend local scanner with both projectPath and live website URL
+      // 2. If local codebase path is provided, also scan source code with AST analyzer
+      if (hasLocalPath) {
         const scanResult = await auditApi.scanLocalProject({
           projectPath: projectPath.trim(),
           websiteUrl: websiteUrl.trim(),
@@ -218,9 +164,11 @@ export default function StartAuditPage() {
         });
 
         const audit = scanResult.data?.audit;
-        const auditId = audit?.id || liveScanResult?.audit?.id || 1;
+        if (audit?.id) {
+          auditId = audit.id;
+        }
 
-        // 3. Store unified live and local data into localStorage for full dashboard & issues access
+        // Store unified live and local data into localStorage
         try {
           const unifiedAudit = {
             ...(liveScanResult?.audit || {}),
@@ -250,43 +198,43 @@ export default function StartAuditPage() {
         } catch (e) {
           console.warn('LocalStorage synchronization warning:', e);
         }
-
-        // Animate local scan steps
-        for (let i = 0; i < activeSteps.length; i++) {
-          await new Promise((r) => setTimeout(r, 350));
-          setAuditProgress({
-            stepIndex: i,
-            percent: Math.round(((i + 1) / activeSteps.length) * 100),
-            currentStep: activeSteps[i],
-          });
-        }
-
-        await new Promise((r) => setTimeout(r, 300));
-        navigate(`/dashboard/issues?auditId=${auditId}`);
-      } catch (err) {
-        setError(err.message || 'Failed to scan live website and local codebase. Please verify both the URL and directory path.');
-        setAuditProgress(null);
-      } finally {
-        setLoading(false);
       }
+
+      // Animate step progress simulation for UI feedback
+      for (let i = 0; i < activeSteps.length; i++) {
+        await new Promise((r) => setTimeout(r, 320));
+        setAuditProgress({
+          stepIndex: i,
+          percent: Math.round(((i + 1) / activeSteps.length) * 100),
+          currentStep: activeSteps[i],
+        });
+      }
+
+      await new Promise((r) => setTimeout(r, 300));
+      navigate(`/dashboard/issues?auditId=${auditId}`);
+    } catch (err) {
+      setError(err.message || 'Failed to complete audit. Please verify the URL.');
+      setAuditProgress(null);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const activeSteps = scanMode === 'online' ? onlineAuditSteps : localAuditSteps;
+  const hasLocalPath = Boolean(projectPath && projectPath.trim());
+  const activeSteps = getAuditSteps(hasLocalPath);
 
   return (
     <div className="max-w-3xl mx-auto space-y-8 animate-fade-in">
       <div>
         <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-3">
           <span>Start Website SEO Audit</span>
-          <span className="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-brand-500/10 text-brand-600 dark:text-brand-400 border border-brand-500/20">
-            {scanMode === 'online' ? '🌐 Live Remote Mode' : '💻 Local Codebase Mode'}
+          <span className="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-brand-500/10 text-brand-600 dark:text-brand-400 border border-brand-500/20 flex items-center gap-1">
+            <Zap className="w-3.5 h-3.5 text-amber-500" />
+            <span>AI Powered</span>
           </span>
         </h1>
         <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-          {scanMode === 'online'
-            ? 'Crawl and analyze a live website over the network. Ideal when source code is not on your computer.'
-            : 'Scan source code files directly on this laptop with exact line numbers, code diffs, and Google Antigravity integration.'}
+          Crawl your live website, inspect DOM structure, calculate real SEO scores, and optionally connect local source code for Google Antigravity IDE line-level fixes.
         </p>
       </div>
 
@@ -364,10 +312,10 @@ export default function StartAuditPage() {
               <Loader2 className="w-5 h-5 text-brand-600 animate-spin" />
               <div>
                 <span className="font-bold text-slate-900 dark:text-white block">
-                  {scanMode === 'online' ? `Auditing ${websiteUrl}` : `Scanning Codebase: ${projectPath}`}
+                  Auditing {websiteUrl}
                 </span>
                 <span className="text-xs text-slate-500">
-                  {scanMode === 'online' ? 'Live Server & Network Inspection' : 'AST Code Parsing & Google Antigravity Synthesis'}
+                  {hasLocalPath ? `Live Network Crawl + Codebase AST Analysis (${projectPath})` : 'Live Server Crawl & Technical SEO Analysis'}
                 </span>
               </div>
             </div>
@@ -417,40 +365,31 @@ export default function StartAuditPage() {
       {/* Main Configuration & Audit Form */}
       {!auditProgress && (
         <form onSubmit={handleSubmit} className="p-6 sm:p-8 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-6">
-          {/* 1. LIVE WEBSITE URL (Always Required - Website must be live) */}
+          {/* 1. LIVE WEBSITE URL (Required) */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
                 Live Website URL <span className="text-rose-500">*</span>
               </label>
               <div className="flex items-center gap-1.5 text-[11px]">
-                <span className="text-slate-400">Local Dev Presets:</span>
+                <span className="text-slate-400">Dev Server Presets:</span>
                 <button
                   type="button"
-                  onClick={() => {
-                    setWebsiteUrl('http://localhost:5173');
-                    setScanMode('local');
-                  }}
+                  onClick={() => setWebsiteUrl('http://localhost:5173')}
                   className="px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-bold hover:bg-indigo-100 dark:hover:bg-indigo-900/60 border border-indigo-200 dark:border-indigo-800 transition-all"
                 >
                   :5173 (Vite)
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    setWebsiteUrl('http://localhost:3000');
-                    setScanMode('local');
-                  }}
+                  onClick={() => setWebsiteUrl('http://localhost:3000')}
                   className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
                 >
                   :3000
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    setWebsiteUrl('http://127.0.0.1:8000');
-                    setScanMode('local');
-                  }}
+                  onClick={() => setWebsiteUrl('http://127.0.0.1:8000')}
                   className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
                 >
                   :8000
@@ -466,215 +405,133 @@ export default function StartAuditPage() {
                 required
                 value={websiteUrl}
                 onChange={(e) => setWebsiteUrl(e.target.value)}
-                placeholder="e.g. http://localhost:5173 or https://mywebsite.com"
+                placeholder="e.g. https://mywebsite.com or http://localhost:5173"
                 className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-base font-mono focus:outline-none focus:ring-2 focus:ring-brand-500"
               />
             </div>
             <p className="text-[11px] text-slate-400 flex items-center gap-1.5">
-              <Zap className="w-3.5 h-3.5 text-amber-500" />
-              The website must be live (online or running on local dev server). We will inspect live HTML, status codes, speed, and metadata.
+              <Zap className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+              The website must be live (online or running on a local dev server). We will crawl live HTML, status codes, speed, and metadata.
             </p>
           </div>
 
-          {/* 2. DEVELOPER OPTION: IS THE WEBSITE'S CODE ON THIS PC? */}
-          <div className="space-y-3 pt-2 border-t border-slate-200 dark:border-slate-800">
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-              Is this website's project folder located on this PC? <span className="text-rose-500">*</span>
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Option 1: Online Website Only */}
-              <button
-                type="button"
-                onClick={() => setScanMode('online')}
-                className={`p-4 rounded-2xl border-2 text-left transition-all relative flex flex-col justify-between gap-3 ${
-                  scanMode === 'online'
-                    ? 'border-brand-500 bg-brand-50/60 dark:bg-brand-950/40 shadow-md shadow-brand-500/10'
-                    : 'border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-850 hover:border-slate-300 dark:hover:border-slate-700'
-                }`}
-              >
-                <div className="flex items-start justify-between w-full">
-                  <div className={`p-2.5 rounded-xl ${
-                    scanMode === 'online' ? 'bg-brand-500 text-white shadow-sm' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-                  }`}>
-                    <Globe className="w-5 h-5" />
-                  </div>
-                  {scanMode === 'online' && (
-                    <div className="w-5 h-5 rounded-full bg-brand-500 text-white flex items-center justify-center">
-                      <Check className="w-3.5 h-3.5 stroke-[3]" />
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-extrabold text-sm text-slate-900 dark:text-white block">
-                      🌐 No, Online Only
-                    </span>
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-brand-500/10 text-brand-600 dark:text-brand-400">
-                      Normal User / Client
-                    </span>
-                  </div>
-                  <span className="text-xs text-slate-500 dark:text-slate-400 mt-1 block leading-relaxed">
-                    Source code is <strong>not on this computer</strong>. Crawls live remote pages, tests HTTP response, on-page SEO, robots.txt, and sitemap.
+          {/* 2. LOCAL PROJECT CODEBASE FOLDER (Optional for Developers) */}
+          <div className="space-y-3 pt-4 border-t border-slate-200 dark:border-slate-800">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                    Local Project Codebase Folder (Optional)
+                  </label>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800">
+                    Google Antigravity IDE Ready
                   </span>
                 </div>
-              </button>
+                <button
+                  type="button"
+                  onClick={handleUseCurrentWorkspace}
+                  className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
+                >
+                  <span>Use Current Workspace</span>
+                </button>
+              </div>
 
-              {/* Option 2: Local Project on PC */}
-              <button
-                type="button"
-                onClick={() => setScanMode('local')}
-                className={`p-4 rounded-2xl border-2 text-left transition-all relative flex flex-col justify-between gap-3 ${
-                  scanMode === 'local'
-                    ? 'border-indigo-500 bg-indigo-50/60 dark:bg-indigo-950/40 shadow-md shadow-indigo-500/10'
-                    : 'border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-850 hover:border-slate-300 dark:hover:border-slate-700'
-                }`}
-              >
-                <div className="flex items-start justify-between w-full">
-                  <div className={`p-2.5 rounded-xl ${
-                    scanMode === 'local' ? 'bg-indigo-500 text-white shadow-sm' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-                  }`}>
-                    <Laptop className="w-5 h-5" />
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <FolderGit2 className="w-5 h-5 text-indigo-500" />
                   </div>
-                  {scanMode === 'local' && (
-                    <div className="w-5 h-5 rounded-full bg-indigo-500 text-white flex items-center justify-center">
-                      <Check className="w-3.5 h-3.5 stroke-[3]" />
-                    </div>
-                  )}
+                  <input
+                    type="text"
+                    value={projectPath}
+                    onChange={(e) => {
+                      setProjectPath(e.target.value);
+                      setPathValidation(null);
+                    }}
+                    placeholder="e.g. C:\Users\AGP KOHAT\Desktop\SEO (leave empty for online-only scan)"
+                    className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
                 </div>
-                <div>
+                <button
+                  type="button"
+                  onClick={() => handleValidatePath()}
+                  disabled={validatingPath || !projectPath.trim()}
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs shrink-0 flex items-center gap-1.5 transition-all disabled:opacity-50"
+                >
+                  {validatingPath ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileCheck className="w-4 h-4 text-emerald-500" />}
+                  <span>Validate Folder</span>
+                </button>
+              </div>
+
+              <p className="mt-1.5 text-[11px] text-slate-400 flex items-center gap-1.5">
+                <Bot className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                If this website's source code is located on this computer, enter the folder path. Our AST engine will map issues to exact code lines and allow 1-click editing in Google Antigravity IDE. Leave empty for remote/client websites.
+              </p>
+            </div>
+
+            {/* Path Validation Preview Banner */}
+            {pathValidation && (
+              <div className="p-3.5 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/80 text-xs flex items-start gap-3 animate-fade-in">
+                <div className="p-2 rounded-lg bg-indigo-500 text-white shrink-0 mt-0.5 shadow-sm">
+                  <Layers className="w-4 h-4" />
+                </div>
+                <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <span className="font-extrabold text-sm text-slate-900 dark:text-white block">
-                      💻 Yes, Local Project on this PC
+                    <span className="font-extrabold text-slate-900 dark:text-white">
+                      {pathValidation.projectName}
                     </span>
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-700 dark:text-indigo-300">
-                      Developer Mode
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30">
+                      {pathValidation.framework}
                     </span>
                   </div>
-                  <span className="text-xs text-slate-500 dark:text-slate-400 mt-1 block leading-relaxed">
-                    Source code folder is <strong>on this PC</strong>. Scans the live website properly, maps issues to your source files, and opens <strong>Google Antigravity IDE</strong> for live coding.
-                  </span>
+                  <p className="text-slate-600 dark:text-slate-300">
+                    Found <strong>{pathValidation.fileCount} source files</strong> ready for line-level AST inspection and Google Antigravity IDE editing.
+                  </p>
                 </div>
-              </button>
+              </div>
+            )}
+          </div>
+
+          {/* 3. MAXIMUM PAGES TO CRAWL */}
+          <div className="pt-4 border-t border-slate-200 dark:border-slate-800">
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                Maximum Pages to Crawl
+              </label>
+              {!isPro && (
+                <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                  <Lock className="w-3 h-3" /> Max 5 on Demo
+                </span>
+              )}
+            </div>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                <Sliders className="w-4 h-4" />
+              </div>
+              <select
+                value={maxPages}
+                onChange={(e) => {
+                  const val = Number(e.target.value);
+                  if (!isPro && val > 5) {
+                    setLimitReason('pro_feature');
+                    setShowLimitModal(true);
+                    setMaxPages(5);
+                    return;
+                  }
+                  setMaxPages(val);
+                }}
+                className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              >
+                <option value={5}>5 pages (Free Demo default)</option>
+                <option value={10}>10 pages {!isPro ? '🔒 (Pro)' : ''}</option>
+                <option value={20}>20 pages {!isPro ? '🔒 (Pro)' : ''}</option>
+                <option value={50}>50 pages {!isPro ? '🔒 (Pro)' : ''}</option>
+              </select>
             </div>
           </div>
 
-          {/* 3. CONDITIONAL INPUTS BASED ON SELECTION */}
-          {scanMode === 'online' ? (
-            /* ONLINE MODE: MAX PAGES */
-            <div className="pt-2 border-t border-slate-200 dark:border-slate-800">
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  Maximum Pages to Crawl
-                </label>
-                {!isPro && (
-                  <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                    <Lock className="w-3 h-3" /> Max 5 on Demo
-                  </span>
-                )}
-              </div>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                  <Sliders className="w-4 h-4" />
-                </div>
-                <select
-                  value={maxPages}
-                  onChange={(e) => {
-                    const val = Number(e.target.value);
-                    if (!isPro && val > 5) {
-                      setLimitReason('pro_feature');
-                      setShowLimitModal(true);
-                      setMaxPages(5);
-                      return;
-                    }
-                    setMaxPages(val);
-                  }}
-                  className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                >
-                  <option value={5}>5 pages (Free Demo default)</option>
-                  <option value={10}>10 pages {!isPro ? '🔒 (Pro)' : ''}</option>
-                  <option value={20}>20 pages {!isPro ? '🔒 (Pro)' : ''}</option>
-                  <option value={50}>50 pages {!isPro ? '🔒 (Pro)' : ''}</option>
-                </select>
-              </div>
-            </div>
-          ) : (
-            /* DEVELOPER MODE: PROJECT FOLDER LOCATION ON PC */
-            <div className="space-y-4 pt-2 border-t border-slate-200 dark:border-slate-800">
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                    Project Folder Location on this PC <span className="text-rose-500">*</span>
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setProjectPath('C:\\Users\\AGP KOHAT\\Desktop\\SEO');
-                      handleValidatePath();
-                    }}
-                    className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
-                  >
-                    <span>Use Current Workspace</span>
-                  </button>
-                </div>
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                      <FolderGit2 className="w-5 h-5 text-indigo-500" />
-                    </div>
-                    <input
-                      type="text"
-                      required
-                      value={projectPath}
-                      onChange={(e) => {
-                        setProjectPath(e.target.value);
-                        setPathValidation(null);
-                      }}
-                      placeholder="e.g. C:\Users\AGP KOHAT\Desktop\SEO"
-                      className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleValidatePath}
-                    disabled={validatingPath || !projectPath.trim()}
-                    className="px-4 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs shrink-0 flex items-center gap-1.5 transition-all"
-                  >
-                    {validatingPath ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileCheck className="w-4 h-4 text-emerald-500" />}
-                    <span>Validate Folder</span>
-                  </button>
-                </div>
-                <p className="mt-1.5 text-[11px] text-slate-400 flex items-center gap-1">
-                  <Bot className="w-3.5 h-3.5 text-indigo-400" />
-                  Scans .html, .jsx, .tsx, .vue, .astro, and .php files. Generates line-level Google Antigravity prompts.
-                </p>
-              </div>
-
-              {/* Path Validation Preview Banner */}
-              {pathValidation && (
-                <div className="p-3.5 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/80 text-xs flex items-start gap-3 animate-fade-in">
-                  <div className="p-2 rounded-lg bg-indigo-500 text-white shrink-0 mt-0.5 shadow-sm">
-                    <Layers className="w-4 h-4" />
-                  </div>
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-extrabold text-slate-900 dark:text-white">
-                        {pathValidation.projectName}
-                      </span>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30">
-                        {pathValidation.framework}
-                      </span>
-                    </div>
-                    <p className="text-slate-600 dark:text-slate-300">
-                      Found <strong>{pathValidation.fileCount} source files</strong> ready for line-level AST SEO inspection.
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* OPTIONAL CONTEXT INPUTS (Shared) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-200 dark:border-slate-800">
+          {/* 4. OPTIONAL CONTEXT INPUTS */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-slate-200 dark:border-slate-800">
             {/* Target Keyword */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
@@ -734,17 +591,17 @@ export default function StartAuditPage() {
           </div>
 
           {/* Submit Action */}
-          <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
-            <div className="text-xs text-slate-400 flex items-center gap-1.5">
-              {scanMode === 'online' ? (
+          <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2">
+              {hasLocalPath ? (
                 <>
-                  <Globe className="w-4 h-4 text-brand-500" />
-                  <span>Remote Server & DOM Crawler</span>
+                  <Bot className="w-4 h-4 text-indigo-500 shrink-0" />
+                  <span>Live Crawler + Google Antigravity Code Fixes</span>
                 </>
               ) : (
                 <>
-                  <Bot className="w-4 h-4 text-indigo-500" />
-                  <span>Live Website & Google Antigravity IDE</span>
+                  <Globe className="w-4 h-4 text-brand-500 shrink-0" />
+                  <span>Live Website Crawler & Technical Engine</span>
                 </>
               )}
             </div>
@@ -752,14 +609,10 @@ export default function StartAuditPage() {
             <button
               type="submit"
               disabled={loading || (!isPro && trialUsage.isLimitReached)}
-              className={`px-6 py-3 rounded-xl font-bold text-sm text-white shadow-md transition-all flex items-center gap-2 ${
-                scanMode === 'online'
-                  ? 'bg-brand-600 hover:bg-brand-700 shadow-brand-500/20'
-                  : 'bg-gradient-to-r from-indigo-600 to-brand-600 hover:from-indigo-500 hover:to-brand-500 shadow-indigo-500/20'
-              }`}
+              className="px-6 py-3 rounded-xl font-bold text-sm text-white bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 shadow-md shadow-brand-500/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
             >
               <Zap className="w-4 h-4" />
-              <span>{scanMode === 'online' ? 'Start Live Website Audit' : 'Start Live & Codebase Audit with Antigravity'}</span>
+              <span>Start Website SEO Audit</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
