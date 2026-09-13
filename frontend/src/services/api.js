@@ -120,6 +120,8 @@ export const auditApi = {
     return api.post('/audits/scan-local', data);
   },
   openInEditor: (data) => api.post('/audits/antigravity/open-editor', data),
+  openWorkspace: (data) => api.post('/audits/antigravity/open-workspace', data),
+  launchAgent: (data) => api.post('/audits/antigravity/open-editor', { ...data, launchAgent: true }),
   applyLocalFix: async (data) => {
     clearApiCache();
     return api.post('/audits/antigravity/apply-local-fix', data);

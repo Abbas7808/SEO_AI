@@ -15,6 +15,7 @@ router.post('/backlit-words', optionalAuth, auditController.analyzeBacklitWords)
 router.post('/validate-local-path', optionalAuth, auditController.validateLocalPath);
 router.post('/scan-local', optionalAuth, auditController.scanLocalProject);
 router.post('/antigravity/open-editor', optionalAuth, auditController.openInAntigravity);
+router.post('/antigravity/open-workspace', optionalAuth, auditController.openWorkspaceInAntigravity);
 router.post('/antigravity/apply-local-fix', optionalAuth, auditController.applyLocalFix);
 
 // Google Antigravity Autonomous SEO Auto-Fixer

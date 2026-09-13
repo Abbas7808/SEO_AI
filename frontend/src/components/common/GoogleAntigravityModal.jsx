@@ -29,6 +29,8 @@ export default function GoogleAntigravityModal({
 }) {
   const [applying, setApplying] = useState(false);
   const [openingEditor, setOpeningEditor] = useState(false);
+  const [openingAgent, setOpeningAgent] = useState(false);
+  const [editorNotice, setEditorNotice] = useState(null);
   const [patchSuccess, setPatchSuccess] = useState(null);
   const [copiedPrompt, setCopiedPrompt] = useState(false);
   const [error, setError] = useState(null);
@@ -44,22 +46,39 @@ export default function GoogleAntigravityModal({
   const handleOpenEditor = async () => {
     setOpeningEditor(true);
     setError(null);
+    setEditorNotice(null);
     try {
       const res = await auditApi.openInEditor({
         projectPath: projectPath || 'C:\\Users\\AGP KOHAT\\Desktop\\SEO',
         filePath,
         lineNumber
       });
-      // Also attempt opening via custom URI scheme in browser
-      if (res?.data?.deepLink) {
-        window.location.href = res.data.deepLink;
-      }
+      setEditorNotice(`Google Antigravity IDE opened for coding at ${filePath}:${lineNumber}!`);
+      setTimeout(() => setEditorNotice(null), 6000);
     } catch (e) {
-      // Fallback: try opening deep link directly
-      const deepLink = `vscode://file/${filePath}:${lineNumber}`;
-      window.location.href = deepLink;
+      setError(e.message || 'Failed to open file in Google Antigravity IDE.');
     } finally {
-      setTimeout(() => setOpeningEditor(false), 800);
+      setOpeningEditor(false);
+    }
+  };
+
+  const handleLaunchAgent = async () => {
+    setOpeningAgent(true);
+    setError(null);
+    setEditorNotice(null);
+    try {
+      const res = await auditApi.launchAgent({
+        projectPath: projectPath || 'C:\\Users\\AGP KOHAT\\Desktop\\SEO',
+        filePath,
+        lineNumber,
+        prompt: antigravityCommand
+      });
+      setEditorNotice(`Google Antigravity AI Agent dispatched with prompt in IDE!`);
+      setTimeout(() => setEditorNotice(null), 6000);
+    } catch (e) {
+      setError(e.message || 'Failed to launch Antigravity AI Agent.');
+    } finally {
+      setOpeningAgent(false);
     }
   };
 
@@ -147,19 +166,37 @@ export default function GoogleAntigravityModal({
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={handleOpenEditor}
-              disabled={openingEditor}
-              className="px-3.5 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-medium flex items-center justify-center gap-1.5 transition-all text-xs shrink-0 shadow-sm"
-            >
-              {openingEditor ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <ExternalLink className="w-3.5 h-3.5 text-indigo-300" />
-              )}
-              <span>Open in Antigravity IDE</span>
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={handleOpenEditor}
+                disabled={openingEditor}
+                className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-brand-600 hover:from-indigo-500 hover:to-brand-500 text-white font-bold flex items-center justify-center gap-1.5 transition-all text-xs shrink-0 shadow-md shadow-indigo-600/20"
+                title="Directly opens Google Antigravity IDE at this exact file and line for live coding"
+              >
+                {openingEditor ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <ExternalLink className="w-3.5 h-3.5 text-white" />
+                )}
+                <span>Open in Antigravity IDE (Line {lineNumber})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleLaunchAgent}
+                disabled={openingAgent}
+                className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-indigo-300 hover:text-white border border-indigo-500/30 font-semibold flex items-center justify-center gap-1.5 transition-all text-xs shrink-0 shadow-sm"
+                title="Launch an Antigravity AI Agent session in the IDE to refactor this issue"
+              >
+                {openingAgent ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-400" />
+                ) : (
+                  <Bot className="w-3.5 h-3.5 text-indigo-400" />
+                )}
+                <span>Launch Agent Chat</span>
+              </button>
+            </div>
           </div>
 
           {/* Code Diff Section */}
@@ -199,6 +236,16 @@ export default function GoogleAntigravityModal({
           </div>
 
           {/* Success or Error alert */}
+          {editorNotice && (
+            <div className="p-3.5 rounded-xl bg-indigo-950/50 border border-indigo-500/50 text-indigo-200 text-xs flex items-start gap-2.5 animate-fade-in shadow-md">
+              <Bot className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold block text-white">Google Antigravity IDE Active</span>
+                <span>{editorNotice}</span>
+              </div>
+            </div>
+          )}
+
           {patchSuccess && (
             <div className="p-3.5 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 text-xs flex items-start gap-2.5">
               <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />

@@ -29,7 +29,8 @@ import {
   CheckCircle,
   Download,
   Laptop,
-  Bot
+  Bot,
+  Loader2
 } from 'lucide-react';
 import { auditApi, antigravityApi } from '../services/api';
 import { getSeverityBadge } from '../utils/formatters';
@@ -48,6 +49,42 @@ export default function IssuesPage() {
   const auditId = searchParams.get('auditId');
 
   const [localAntigravityIssue, setLocalAntigravityIssue] = useState(null);
+  const [openingWorkspace, setOpeningWorkspace] = useState(false);
+  const [quickOpeningId, setQuickOpeningId] = useState(null);
+  const [toastMessage, setToastMessage] = useState(null);
+
+  const showToast = (msg) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 5000);
+  };
+
+  const handleOpenWorkspace = async (projectPath) => {
+    setOpeningWorkspace(true);
+    try {
+      await auditApi.openWorkspace({ projectPath: projectPath || 'C:\\Users\\AGP KOHAT\\Desktop\\SEO' });
+      showToast('Opened project folder in Google Antigravity IDE for coding!');
+    } catch (e) {
+      showToast(`Error: ${e.message || 'Could not open workspace'}`);
+    } finally {
+      setOpeningWorkspace(false);
+    }
+  };
+
+  const handleQuickOpenInAntigravity = async (issue, projectPath) => {
+    setQuickOpeningId(issue.id);
+    try {
+      await auditApi.openInEditor({
+        projectPath: projectPath || 'C:\\Users\\AGP KOHAT\\Desktop\\SEO',
+        filePath: issue.file_path,
+        lineNumber: issue.line_number || 1
+      });
+      showToast(`Opened ${issue.file_path}:${issue.line_number || 1} in Google Antigravity IDE for coding!`);
+    } catch (e) {
+      showToast(`Error: ${e.message || 'Could not open file in Antigravity'}`);
+    } finally {
+      setQuickOpeningId(null);
+    }
+  };
 
   const [issues, setIssues] = useState([]);
   const [currentAudit, setCurrentAudit] = useState(null);
@@ -414,17 +451,34 @@ export default function IssuesPage() {
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => {
-                const firstWithFile = issues.find(i => i.file_path);
-                if (firstWithFile) setLocalAntigravityIssue(firstWithFile);
-              }}
-              className="px-4 py-2.5 rounded-xl font-bold text-xs text-white bg-indigo-600 hover:bg-indigo-500 shadow-md shadow-indigo-500/20 shrink-0 flex items-center justify-center gap-2 transition-all"
-            >
-              <Bot className="w-4 h-4" />
-              <span>Launch Google Antigravity</span>
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handleOpenWorkspace(localProjectPath)}
+                disabled={openingWorkspace}
+                className="px-4 py-2.5 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-indigo-600 to-brand-600 hover:from-indigo-500 hover:to-brand-500 shadow-md shadow-indigo-500/20 shrink-0 flex items-center justify-center gap-2 transition-all"
+                title="Physically launches Google Antigravity IDE with this project folder open for coding"
+              >
+                {openingWorkspace ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Bot className="w-4 h-4" />
+                )}
+                <span>Open Project in Antigravity IDE</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const firstWithFile = issues.find(i => i.file_path);
+                  if (firstWithFile) setLocalAntigravityIssue(firstWithFile);
+                }}
+                className="px-4 py-2.5 rounded-xl font-bold text-xs bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 shadow-xs shrink-0 flex items-center justify-center gap-1.5 transition-all"
+              >
+                <FileCode className="w-4 h-4 text-indigo-500" />
+                <span>Inspect AST Line Fixes</span>
+              </button>
+            </div>
           </div>
         ) : (
           <TechnicalSeoPanel 
@@ -664,14 +718,32 @@ export default function IssuesPage() {
                     {/* Action Controls */}
                     <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
                       {issue.file_path ? (
-                        <button
-                          type="button"
-                          onClick={() => setLocalAntigravityIssue(issue)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-indigo-600 to-brand-600 hover:from-indigo-500 hover:to-brand-500 text-white shadow-xs transition"
-                        >
-                          <Bot className="w-3.5 h-3.5" />
-                          <span>Open in Google Antigravity</span>
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleQuickOpenInAntigravity(issue, currentAudit?.project_path)}
+                            disabled={quickOpeningId === issue.id}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-indigo-600 to-brand-600 hover:from-indigo-500 hover:to-brand-500 text-white shadow-xs transition"
+                            title="Directly opens Google Antigravity IDE at this exact file and line for live coding"
+                          >
+                            {quickOpeningId === issue.id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            )}
+                            <span>Open in Antigravity (Line {issue.line_number || 1})</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setLocalAntigravityIssue(issue)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
+                            title="Inspect code diff and auto-patch options"
+                          >
+                            <Bot className="w-3.5 h-3.5 text-indigo-500" />
+                            <span>Inspect & Fix</span>
+                          </button>
+                        </div>
                       ) : (
                         <button
                           type="button"
@@ -917,6 +989,26 @@ export default function IssuesPage() {
           setResolvedIssueIds(prev => new Set([...prev, issueId]));
         }}
       />
+
+      {/* Toast feedback for IDE actions */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 max-w-md p-4 rounded-2xl bg-slate-900 border border-indigo-500/50 shadow-2xl text-white text-xs flex items-center gap-3 animate-fade-in">
+          <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center shrink-0">
+            <Bot className="w-4 h-4 text-white" />
+          </div>
+          <div className="flex-1">
+            <p className="font-bold text-white">Google Antigravity IDE</p>
+            <p className="text-indigo-200 mt-0.5">{toastMessage}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setToastMessage(null)}
+            className="p-1 rounded-lg text-slate-400 hover:text-white transition"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

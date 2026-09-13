@@ -1,5 +1,6 @@
 const LocalScannerService = require('../services/localScanner');
 const LocalFilePatcher = require('../services/localScanner/patcher');
+const AntigravityLauncher = require('../utils/antigravityLauncher');
 const { exec } = require('child_process');
 const path = require('path');
 const auditModel = require('../models/auditModel');
@@ -1017,33 +1018,50 @@ const auditController = {
 
   async openInAntigravity(req, res, next) {
     try {
-      const { projectPath, filePath, lineNumber = 1 } = req.body;
+      const { projectPath, filePath, lineNumber = 1, launchAgent = false, prompt } = req.body;
       if (!projectPath || !filePath) {
         return res.status(400).json({ success: false, message: 'projectPath and filePath are required.' });
       }
 
       const fullPath = path.resolve(projectPath, filePath);
-      const vscodeUri = `vscode://file/${fullPath.replace(/\\/g, '/')}:${lineNumber}`;
+      const antigravityPrompt = prompt || `/goal In ${filePath} at line ${lineNumber}, refactor SEO issue with clean code.`;
 
-      // Try launching editor in background via command line
-      try {
-        exec(`code -g "${fullPath}:${lineNumber}"`, (err) => {
-          if (err) {
-            exec(`start "" "${vscodeUri}"`, () => {});
-          }
-        });
-      } catch (e) {}
+      // 1. Open the file at exact line in Google Antigravity IDE for coding
+      const openResult = await AntigravityLauncher.openFileAtLine(fullPath, lineNumber);
+
+      // 2. If requested, also launch an active Antigravity Agent chat session
+      if (launchAgent) {
+        await AntigravityLauncher.launchAgentChat(fullPath, antigravityPrompt);
+      }
 
       res.json({
         success: true,
-        message: 'Dispatched open request to Google Antigravity / IDE.',
+        message: 'Opened in Google Antigravity IDE for coding!',
         data: {
           filePath,
           fullPath,
           lineNumber,
-          deepLink: vscodeUri,
-          antigravityPrompt: `/goal Open and refactor SEO issues in ${filePath} at line ${lineNumber}`
+          openResult,
+          antigravityPrompt
         }
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async openWorkspaceInAntigravity(req, res, next) {
+    try {
+      const { projectPath } = req.body;
+      if (!projectPath) {
+        return res.status(400).json({ success: false, message: 'projectPath is required.' });
+      }
+
+      const result = await AntigravityLauncher.openWorkspace(projectPath);
+      res.json({
+        success: true,
+        message: 'Opened workspace in Google Antigravity IDE for coding!',
+        data: result
       });
     } catch (error) {
       next(error);
