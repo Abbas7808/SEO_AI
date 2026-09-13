@@ -9,7 +9,7 @@ const issueModel = {
     const placeholders = [];
 
     for (const issue of issues) {
-      placeholders.push('(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+      placeholders.push('(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
       values.push(
         issue.auditId,
         issue.pageId || null,
@@ -23,12 +23,16 @@ const issueModel = {
         issue.suggestedFix || issue.suggested_fix || null,
         issue.solutionSteps ? (typeof issue.solutionSteps === 'string' ? issue.solutionSteps : JSON.stringify(issue.solutionSteps)) : null,
         issue.pageUrl || null,
+        issue.filePath || issue.file_path || null,
+        issue.lineNumber || issue.line_number || null,
+        issue.codeSnippet || issue.code_snippet || null,
+        issue.codeDiff || issue.code_diff || null,
         issue.status || 'open'
       );
     }
 
     const sql = `INSERT INTO seo_issues 
-      (audit_id, page_id, issue_type, category, severity, title, description, impact, recommendation, suggested_fix, solution_steps, page_url, status) 
+      (audit_id, page_id, issue_type, category, severity, title, description, impact, recommendation, suggested_fix, solution_steps, page_url, file_path, line_number, code_snippet, code_diff, status) 
       VALUES ${placeholders.join(', ')}`;
 
     const result = await db.query(sql, values);

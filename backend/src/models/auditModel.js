@@ -5,15 +5,17 @@ const auditModel = {
     userId = null,
     websiteUrl,
     maxPages = 20,
+    scanMode = 'online',
+    projectPath = null,
     targetKeyword = null,
     businessName = null,
     businessLocation = null
   }) {
     const result = await db.query(
       `INSERT INTO audits 
-       (user_id, website_url, max_pages, target_keyword, business_name, business_location, status) 
-       VALUES (?, ?, ?, ?, ?, ?, 'pending')`,
-      [userId, websiteUrl, maxPages, targetKeyword, businessName, businessLocation]
+       (user_id, website_url, max_pages, scan_mode, project_path, target_keyword, business_name, business_location, status) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+      [userId, websiteUrl, maxPages, scanMode, projectPath, targetKeyword, businessName, businessLocation]
     );
     return result.insertId;
   },

@@ -111,10 +111,19 @@ export const auditApi = {
   getPages: (id, config) => cachedGet(`/audits/${id}/pages`, config, 60000),
   getIssues: (id, severity, config) => cachedGet(`/audits/${id}/issues`, { ...config, params: { severity, ...(config?.params || {}) } }, 60000),
   getRoadmap: (id, config) => cachedGet(`/audits/${id}/roadmap`, config, 60000),
-  getBacklinkAnalysis: (id, config) => cachedGet(`/audits/${id}/backlinks`, config, 60000),
   inspectSite: (data) => api.post('/audits/inspect-site', data),
   compareAudits: (data) => api.post('/audits/compare', data),
   analyzeBacklitWords: (data) => api.post('/audits/backlit-words', data),
+  validateLocalPath: (data) => api.post('/audits/validate-local-path', data),
+  scanLocalProject: async (data) => {
+    clearApiCache();
+    return api.post('/audits/scan-local', data);
+  },
+  openInEditor: (data) => api.post('/audits/antigravity/open-editor', data),
+  applyLocalFix: async (data) => {
+    clearApiCache();
+    return api.post('/audits/antigravity/apply-local-fix', data);
+  },
 };
 
 export const aiApi = {

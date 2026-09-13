@@ -48,6 +48,31 @@ async function initDatabase() {
       logger.warn(`Schema file not found at ${schemaPath}`);
     }
 
+    // Step 4: Safe column migrations for dual scan mode and local codebase issues
+    try {
+      const [auditCols] = await pool.query("SHOW COLUMNS FROM audits LIKE 'scan_mode'");
+      if (auditCols.length === 0) {
+        await pool.query("ALTER TABLE audits ADD COLUMN scan_mode ENUM('online', 'local') NOT NULL DEFAULT 'online' AFTER max_pages");
+        await pool.query("ALTER TABLE audits ADD COLUMN project_path VARCHAR(1024) NULL AFTER scan_mode");
+        logger.info('Audits table migrated with scan_mode and project_path columns.');
+      }
+    } catch (e) {
+      logger.warn(`Audits column check note: ${e.message}`);
+    }
+
+    try {
+      const [issueCols] = await pool.query("SHOW COLUMNS FROM seo_issues LIKE 'file_path'");
+      if (issueCols.length === 0) {
+        await pool.query("ALTER TABLE seo_issues ADD COLUMN file_path VARCHAR(1024) NULL AFTER page_url");
+        await pool.query("ALTER TABLE seo_issues ADD COLUMN line_number INT NULL AFTER file_path");
+        await pool.query("ALTER TABLE seo_issues ADD COLUMN code_snippet TEXT NULL AFTER line_number");
+        await pool.query("ALTER TABLE seo_issues ADD COLUMN code_diff TEXT NULL AFTER code_snippet");
+        logger.info('SEO issues table migrated with local file and diff columns.');
+      }
+    } catch (e) {
+      logger.warn(`SEO issues column check note: ${e.message}`);
+    }
+
     return pool;
   } catch (error) {
     logger.error('Failed to initialize database:', error.message);

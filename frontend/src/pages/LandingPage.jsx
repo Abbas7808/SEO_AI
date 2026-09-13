@@ -17,12 +17,15 @@ import {
   Lock,
   Cpu,
   TrendingUp,
-  Activity
+  Activity,
+  Laptop,
+  FileCode
 } from 'lucide-react';
 import ScoreBadge from '../components/common/ScoreBadge';
 import { useScrollReveal } from '../hooks/useScrollReveal';
 
 export default function LandingPage() {
+  const [heroMode, setHeroMode] = useState('online'); // 'online' | 'local'
   const [urlInput, setUrlInput] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
@@ -35,15 +38,18 @@ export default function LandingPage() {
   const handleStartAudit = (e) => {
     e.preventDefault();
     if (!urlInput.trim()) {
-      setError('Please enter a website URL');
+      setError(heroMode === 'online' ? 'Please enter a website URL' : 'Please enter a project directory path');
       return;
     }
-    setError('');
-    const hasToken = !!localStorage.getItem('seo_token');
-    if (!hasToken) {
-      navigate(`/register?redirect=${encodeURIComponent(urlInput.trim())}`);
+
+    if (heroMode === 'online') {
+      let formattedUrl = urlInput.trim();
+      if (!formattedUrl.startsWith('http://') && !formattedUrl.startsWith('https://')) {
+        formattedUrl = `https://${formattedUrl}`;
+      }
+      navigate(`/dashboard/new?mode=online&url=${encodeURIComponent(formattedUrl)}`);
     } else {
-      navigate(`/dashboard/new?url=${encodeURIComponent(urlInput.trim())}`);
+      navigate(`/dashboard/new?mode=local&path=${encodeURIComponent(urlInput.trim())}`);
     }
   };
 
@@ -141,14 +147,50 @@ export default function LandingPage() {
         </p>
 
         {/* Audit Form Box */}
-        <div className="mt-10 max-w-2xl mx-auto">
+        <div className="mt-10 max-w-2xl mx-auto space-y-3">
+          {/* Mode Selector Toggle */}
+          <div className="inline-flex p-1 rounded-2xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 text-xs font-bold">
+            <button
+              type="button"
+              onClick={() => {
+                setHeroMode('online');
+                setUrlInput('');
+                setError('');
+              }}
+              className={`px-4 py-1.5 rounded-xl transition-all flex items-center gap-1.5 ${
+                heroMode === 'online'
+                  ? 'bg-white dark:bg-slate-900 text-brand-600 dark:text-brand-400 shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <Globe className="w-3.5 h-3.5" />
+              <span>🌐 Live Website (Remote)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setHeroMode('local');
+                setUrlInput('C:\\Users\\AGP KOHAT\\Desktop\\SEO');
+                setError('');
+              }}
+              className={`px-4 py-1.5 rounded-xl transition-all flex items-center gap-1.5 ${
+                heroMode === 'local'
+                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <Laptop className="w-3.5 h-3.5" />
+              <span>💻 Local Codebase (On Laptop)</span>
+            </button>
+          </div>
+
           <form
             onSubmit={handleStartAudit}
             className="flex flex-col sm:flex-row items-center gap-2 p-2 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-2 border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl shadow-brand-500/5 focus-within:border-brand-500 dark:focus-within:border-brand-500 transition-all duration-200"
           >
             <div className="relative flex-1 w-full">
               <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                <Globe className="w-5 h-5" />
+                {heroMode === 'online' ? <Globe className="w-5 h-5" /> : <FileCode className="w-5 h-5 text-indigo-500" />}
               </div>
               <input
                 type="text"
@@ -157,16 +199,20 @@ export default function LandingPage() {
                   setUrlInput(e.target.value);
                   setError('');
                 }}
-                placeholder="https://yourwebsite.com"
-                className="w-full pl-10 pr-4 py-3 bg-transparent text-slate-900 dark:text-white placeholder-slate-400 text-base focus:outline-none"
+                placeholder={heroMode === 'online' ? "https://yourwebsite.com" : "C:\\Users\\...\\MyProject"}
+                className={`w-full pl-10 pr-4 py-3 bg-transparent text-slate-900 dark:text-white placeholder-slate-400 text-base focus:outline-none ${heroMode === 'local' ? 'font-mono text-sm' : ''}`}
               />
             </div>
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <button
                 type="submit"
-                className="w-full sm:w-auto px-6 py-3 rounded-xl font-bold text-white bg-brand-600 hover:bg-brand-700 shadow-md shadow-brand-500/20 transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-2 whitespace-nowrap"
+                className={`w-full sm:w-auto px-6 py-3 rounded-xl font-bold text-white shadow-md transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-2 whitespace-nowrap ${
+                  heroMode === 'online'
+                    ? 'bg-brand-600 hover:bg-brand-700 shadow-brand-500/20'
+                    : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-500/20'
+                }`}
               >
-                <span>Analyze Website</span>
+                <span>{heroMode === 'online' ? 'Analyze Website' : 'Scan Codebase'}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>

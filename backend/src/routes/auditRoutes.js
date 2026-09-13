@@ -11,6 +11,12 @@ router.post('/inspect-site', optionalAuth, auditController.inspectSite);
 router.post('/compare', optionalAuth, auditController.compareAudits);
 router.post('/backlit-words', optionalAuth, auditController.analyzeBacklitWords);
 
+// Local Codebase Scanning & Direct File Patching
+router.post('/validate-local-path', optionalAuth, auditController.validateLocalPath);
+router.post('/scan-local', optionalAuth, auditController.scanLocalProject);
+router.post('/antigravity/open-editor', optionalAuth, auditController.openInAntigravity);
+router.post('/antigravity/apply-local-fix', optionalAuth, auditController.applyLocalFix);
+
 // Google Antigravity Autonomous SEO Auto-Fixer
 router.post('/antigravity/repair-issue', optionalAuth, auditController.repairIssueWithAntigravity);
 

@@ -1,3 +1,7 @@
+const LocalScannerService = require('../services/localScanner');
+const LocalFilePatcher = require('../services/localScanner/patcher');
+const { exec } = require('child_process');
+const path = require('path');
 const auditModel = require('../models/auditModel');
 const pageModel = require('../models/pageModel');
 const issueModel = require('../models/issueModel');
@@ -868,6 +872,250 @@ const auditController = {
       res.send(blueprint.unifiedCodeBundle);
     } catch (error) {
       next(error);
+    }
+  },
+
+  async validateLocalPath(req, res, next) {
+    try {
+      const { projectPath } = req.body;
+      const result = LocalScannerService.validatePath(projectPath);
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async scanLocalProject(req, res, next) {
+    try {
+      const {
+        projectPath,
+        targetKeyword,
+        businessName,
+        businessLocation
+      } = req.body;
+
+      if (!projectPath) {
+        return res.status(400).json({ success: false, message: 'Local project path is required.' });
+      }
+
+      const scanResult = await LocalScannerService.scanProject(projectPath, {
+        targetKeyword: targetKeyword ? targetKeyword.trim() : '',
+        businessName: businessName ? businessName.trim() : '',
+        businessLocation: businessLocation ? businessLocation.trim() : ''
+      });
+
+      const userId = req.user ? req.user.id : null;
+      const displayUrl = `local://${scanResult.projectName}`;
+
+      // Insert audit into DB
+      const auditId = await auditModel.create({
+        userId,
+        websiteUrl: displayUrl,
+        maxPages: scanResult.filesScanned,
+        scanMode: 'local',
+        projectPath: scanResult.projectPath,
+        targetKeyword: targetKeyword ? targetKeyword.trim() : null,
+        businessName: businessName ? businessName.trim() : null,
+        businessLocation: businessLocation ? businessLocation.trim() : null
+      });
+
+      // Insert analyzed pages
+      for (const file of scanResult.analyzedFiles.slice(0, 30)) {
+        await pageModel.create({
+          auditId,
+          url: file.path,
+          statusCode: 200,
+          title: path.basename(file.path),
+          metaDescription: `Local source file: ${file.path}`,
+          canonicalUrl: null,
+          h1Count: 1,
+          wordCount: Math.round(file.size / 6),
+          imageCount: 0,
+          internalLinkCount: 0,
+          externalLinkCount: 0,
+          seoScore: Math.max(20, 100 - (file.issuesCount * 12)),
+          loadTimeMs: 15,
+          pageSizeKb: Number((file.size / 1024).toFixed(1))
+        });
+      }
+
+      // Insert issues with file_path and line_number
+      if (scanResult.issues.length > 0) {
+        const issuesToInsert = scanResult.issues.map(issue => ({
+          auditId,
+          pageId: null,
+          issueType: issue.issue_type,
+          category: issue.category || 'technical',
+          severity: issue.severity,
+          title: issue.title,
+          description: issue.description,
+          impact: issue.impact,
+          recommendation: issue.recommendation,
+          suggestedFix: issue.suggested_fix,
+          solutionSteps: issue.antigravity_command,
+          pageUrl: issue.file_path,
+          filePath: issue.file_path,
+          lineNumber: issue.line_number,
+          codeSnippet: issue.code_snippet,
+          codeDiff: issue.code_diff,
+          status: 'open'
+        }));
+
+        await issueModel.createMany(issuesToInsert);
+      }
+
+      // Update audit scores
+      await auditModel.updateScores(auditId, {
+        seoScore: scanResult.overallScore,
+        technicalScore: scanResult.technicalScore,
+        onpageScore: scanResult.onPageScore,
+        contentScore: scanResult.contentScore,
+        performanceScore: scanResult.performanceScore,
+        structuredDataScore: scanResult.structuredDataScore,
+        socialScore: scanResult.socialScore,
+        localScore: scanResult.localScore,
+        pagesCrawled: scanResult.filesScanned,
+        aiSummary: JSON.stringify({
+          summary: `Local codebase scan of ${scanResult.projectName} completed with an SEO health score of ${scanResult.overallScore}/100. ${scanResult.summary.total} code-level optimization opportunities detected across ${scanResult.filesScanned} source files.`,
+          localScan: true,
+          projectName: scanResult.projectName,
+          projectPath: scanResult.projectPath,
+          framework: scanResult.framework
+        })
+      });
+
+      await auditModel.updateStatus(auditId, 'completed');
+
+      const completedAudit = await auditModel.findById(auditId);
+      const insertedIssues = await issueModel.findByAudit(auditId);
+
+      res.status(201).json({
+        success: true,
+        message: 'Local codebase scan completed successfully.',
+        data: {
+          audit: completedAudit,
+          scoreResult: {
+            overallScore: scanResult.overallScore,
+            technicalScore: scanResult.technicalScore,
+            onPageScore: scanResult.onPageScore,
+            contentScore: scanResult.contentScore,
+            performanceScore: scanResult.performanceScore,
+            structuredDataScore: scanResult.structuredDataScore,
+            socialScore: scanResult.socialScore,
+            localScore: scanResult.localScore,
+            issues: insertedIssues
+          },
+          summary: scanResult.summary,
+          framework: scanResult.framework
+        }
+      });
+    } catch (error) {
+      logger.error(`Error scanning local project: ${error.message}`);
+      next(error);
+    }
+  },
+
+  async openInAntigravity(req, res, next) {
+    try {
+      const { projectPath, filePath, lineNumber = 1 } = req.body;
+      if (!projectPath || !filePath) {
+        return res.status(400).json({ success: false, message: 'projectPath and filePath are required.' });
+      }
+
+      const fullPath = path.resolve(projectPath, filePath);
+      const vscodeUri = `vscode://file/${fullPath.replace(/\\/g, '/')}:${lineNumber}`;
+
+      // Try launching editor in background via command line
+      try {
+        exec(`code -g "${fullPath}:${lineNumber}"`, (err) => {
+          if (err) {
+            exec(`start "" "${vscodeUri}"`, () => {});
+          }
+        });
+      } catch (e) {}
+
+      res.json({
+        success: true,
+        message: 'Dispatched open request to Google Antigravity / IDE.',
+        data: {
+          filePath,
+          fullPath,
+          lineNumber,
+          deepLink: vscodeUri,
+          antigravityPrompt: `/goal Open and refactor SEO issues in ${filePath} at line ${lineNumber}`
+        }
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async applyLocalFix(req, res, next) {
+    try {
+      const {
+        auditId,
+        issueId,
+        projectPath,
+        filePath,
+        lineNumber,
+        replacementCode,
+        originalCode
+      } = req.body;
+
+      let targetProjectPath = projectPath;
+      let targetFilePath = filePath;
+      let targetLine = lineNumber;
+      let targetCode = replacementCode;
+      let origCode = originalCode;
+
+      if (issueId && (!targetFilePath || !targetCode)) {
+        const issue = await issueModel.findById(issueId);
+        if (issue) {
+          targetFilePath = targetFilePath || issue.file_path || issue.page_url;
+          targetLine = targetLine || issue.line_number;
+          targetCode = targetCode || issue.suggested_fix;
+          origCode = origCode || issue.code_snippet;
+        }
+      }
+
+      if (auditId && !targetProjectPath) {
+        const audit = await auditModel.findById(auditId);
+        if (audit && audit.project_path) {
+          targetProjectPath = audit.project_path;
+        }
+      }
+
+      if (!targetProjectPath || !targetFilePath || !targetCode) {
+        return res.status(400).json({
+          success: false,
+          message: 'Target project path, file path, and replacement code are required to apply fix.'
+        });
+      }
+
+      const patchResult = LocalFilePatcher.applyFix({
+        projectPath: targetProjectPath,
+        filePath: targetFilePath,
+        lineNumber: targetLine,
+        replacementCode: targetCode,
+        originalCode: origCode
+      });
+
+      if (issueId) {
+        await issueModel.updateStatus(issueId, 'resolved');
+      }
+
+      if (auditId) {
+        await auditModel.boostScore(auditId, 8);
+      }
+
+      res.json({
+        success: true,
+        message: 'Code patch safely applied to file on disk! Backup created.',
+        data: patchResult
+      });
+    } catch (error) {
+      logger.error(`Error applying local code fix: ${error.message}`);
+      res.status(500).json({ success: false, message: error.message });
     }
   }
 };

@@ -27,7 +27,9 @@ import {
   FileCode,
   Layers,
   CheckCircle,
-  Download
+  Download,
+  Laptop,
+  Bot
 } from 'lucide-react';
 import { auditApi, antigravityApi } from '../services/api';
 import { getSeverityBadge } from '../utils/formatters';
@@ -37,11 +39,15 @@ import SeoSkillsGuide from '../components/common/SeoSkillsGuide';
 import AdvancedSiteIntelligence from '../components/common/AdvancedSiteIntelligence';
 import CodeDiffViewer from '../components/common/CodeDiffViewer';
 import DetectedTechStackCard from '../components/common/DetectedTechStackCard';
+import TechnicalSeoPanel from '../components/common/TechnicalSeoPanel';
+import GoogleAntigravityModal from '../components/common/GoogleAntigravityModal';
 import { exportIssuesToCsv, exportAuditToJson, exportAuditToMarkdown } from '../utils/exportUtils';
 
 export default function IssuesPage() {
   const [searchParams] = useSearchParams();
   const auditId = searchParams.get('auditId');
+
+  const [localAntigravityIssue, setLocalAntigravityIssue] = useState(null);
 
   const [issues, setIssues] = useState([]);
   const [currentAudit, setCurrentAudit] = useState(null);
@@ -379,6 +385,56 @@ export default function IssuesPage() {
         issues={issues}
       />
 
+      {/* SCAN LOCATION DIAGNOSTICS: ONLINE TECHNICAL PANEL VS LOCAL CODEBASE BANNER */}
+      {(() => {
+        const isLocalScan = currentAudit?.scan_mode === 'local' || currentAudit?.website_url?.startsWith('local://') || issues.some(i => !!i.file_path);
+        const localProjectPath = currentAudit?.project_path || 'C:\\Users\\AGP KOHAT\\Desktop\\SEO';
+
+        return isLocalScan ? (
+          <div className="p-5 sm:p-6 rounded-2xl bg-indigo-50/80 dark:bg-indigo-950/40 border-2 border-indigo-500/40 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs animate-fade-in">
+            <div className="flex items-start gap-3.5">
+              <div className="p-2.5 rounded-xl bg-indigo-600 text-white shadow-md shadow-indigo-600/20 shrink-0 mt-0.5">
+                <Laptop className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-extrabold text-sm text-slate-900 dark:text-white">
+                    💻 Local Project Codebase Audit Active
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30">
+                    Local Laptop Code
+                  </span>
+                </div>
+                <p className="text-slate-700 dark:text-slate-300 mt-1 font-mono text-[11px] bg-white/70 dark:bg-slate-900/60 px-2 py-1 rounded-lg border border-indigo-200 dark:border-indigo-900 inline-block">
+                  📁 {localProjectPath}
+                </p>
+                <p className="text-slate-500 dark:text-slate-400 mt-1">
+                  Issues below are mapped to exact line numbers in your local files. Use <strong>"Open in Google Antigravity"</strong> to inspect or apply code fixes directly to disk.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                const firstWithFile = issues.find(i => i.file_path);
+                if (firstWithFile) setLocalAntigravityIssue(firstWithFile);
+              }}
+              className="px-4 py-2.5 rounded-xl font-bold text-xs text-white bg-indigo-600 hover:bg-indigo-500 shadow-md shadow-indigo-500/20 shrink-0 flex items-center justify-center gap-2 transition-all"
+            >
+              <Bot className="w-4 h-4" />
+              <span>Launch Google Antigravity</span>
+            </button>
+          </div>
+        ) : (
+          <TechnicalSeoPanel 
+            websiteUrl={currentAudit?.website_url || 'https://example.com'}
+            auditData={currentAudit}
+            pages={auditPages}
+          />
+        );
+      })()}
+
       {/* 3. WEBSITE ISSUES & RESOLUTION CENTER */}
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -575,32 +631,57 @@ export default function IssuesPage() {
                           {issue.title}
                         </h3>
 
-                        <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 truncate">
-                          <span className="truncate">URL: {issue.page_url || currentAudit?.website_url || 'https://example.com'}</span>
-                          {issue.page_url && (
-                            <a
-                              href={issue.page_url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-indigo-500 hover:text-indigo-600 shrink-0 inline-flex items-center gap-0.5"
-                            >
-                              <ExternalLink className="w-3 h-3" />
-                            </a>
-                          )}
-                        </div>
+                        {issue.file_path ? (
+                          <div className="flex items-center gap-2 text-xs font-mono text-indigo-600 dark:text-indigo-400 font-semibold flex-wrap">
+                            <span className="flex items-center gap-1 bg-indigo-50 dark:bg-indigo-950/80 px-2 py-0.5 rounded-md border border-indigo-200 dark:border-indigo-800">
+                              <FileCode className="w-3.5 h-3.5 shrink-0 text-indigo-500" />
+                              <span>{issue.file_path}</span>
+                            </span>
+                            {issue.line_number && (
+                              <span className="px-2 py-0.5 rounded-md bg-indigo-100 dark:bg-indigo-900/60 text-indigo-800 dark:text-indigo-300 text-[10px] font-bold">
+                                Line {issue.line_number}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 truncate">
+                            <span className="truncate">URL: {issue.page_url || currentAudit?.website_url || 'https://example.com'}</span>
+                            {issue.page_url && (
+                              <a
+                                href={issue.page_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-indigo-500 hover:text-indigo-600 shrink-0 inline-flex items-center gap-0.5"
+                              >
+                                <ExternalLink className="w-3 h-3" />
+                              </a>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
 
                     {/* Action Controls */}
                     <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => handleOpenAntigravity(issue)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition"
-                      >
-                        <Sparkles className="w-3.5 h-3.5" />
-                        <span>Interactive Auto-Fixer</span>
-                      </button>
+                      {issue.file_path ? (
+                        <button
+                          type="button"
+                          onClick={() => setLocalAntigravityIssue(issue)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-indigo-600 to-brand-600 hover:from-indigo-500 hover:to-brand-500 text-white shadow-xs transition"
+                        >
+                          <Bot className="w-3.5 h-3.5" />
+                          <span>Open in Google Antigravity</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenAntigravity(issue)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition"
+                        >
+                          <Sparkles className="w-3.5 h-3.5" />
+                          <span>Interactive Auto-Fixer</span>
+                        </button>
+                      )}
 
                       <button
                         type="button"
@@ -824,6 +905,18 @@ export default function IssuesPage() {
           </div>
         </div>
       )}
+
+      {/* Google Antigravity Code Refactoring & IDE Modal for Local Audits */}
+      <GoogleAntigravityModal
+        isOpen={!!localAntigravityIssue}
+        onClose={() => setLocalAntigravityIssue(null)}
+        issue={localAntigravityIssue}
+        auditId={currentAudit?.id || auditId}
+        projectPath={currentAudit?.project_path || 'C:\\Users\\AGP KOHAT\\Desktop\\SEO'}
+        onFixApplied={(issueId) => {
+          setResolvedIssueIds(prev => new Set([...prev, issueId]));
+        }}
+      />
     </div>
   );
 }
