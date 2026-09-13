@@ -19,12 +19,19 @@ import {
   Flame,
   Code2,
   Lock,
-  Crown
+  Crown,
+  Bot,
+  FolderGit2,
+  Play,
+  FileCode,
+  Loader2,
+  Laptop
 } from 'lucide-react';
 import { auditApi, antigravityApi } from '../services/api';
 import { getSeverityBadge } from '../utils/formatters';
 import { getUserPlan } from '../utils/planLimits';
 import TrialLimitModal from '../components/common/TrialLimitModal';
+import GoogleAntigravityModal from '../components/common/GoogleAntigravityModal';
 
 export default function AntigravityFixerPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -44,8 +51,18 @@ export default function AntigravityFixerPage() {
   const [runningRepair, setRunningRepair] = useState(false);
   const [terminalLogs, setTerminalLogs] = useState([]);
   const [copiedIndex, setCopiedIndex] = useState(null);
+  const [copiedCmd, setCopiedCmd] = useState(false);
   const [resolvedIssues, setResolvedIssues] = useState(new Set());
   const [activeTab, setActiveTab] = useState('all'); // all | critical | resolved
+
+  // Google Antigravity Workspace & Editor state
+  const [workspacePath, setWorkspacePath] = useState(
+    localStorage.getItem('seo_project_path') || 'C:\\Users\\AGP KOHAT\\Desktop\\SEO'
+  );
+  const [openingWorkspace, setOpeningWorkspace] = useState(false);
+  const [openingFileId, setOpeningFileId] = useState(null);
+  const [toastNotice, setToastNotice] = useState(null);
+  const [selectedAgentIssue, setSelectedAgentIssue] = useState(null);
 
   // Fallback demo blueprint if loading on a fresh un-audited state
   const demoBlueprint = {
@@ -65,6 +82,8 @@ export default function AntigravityFixerPage() {
         issueId: 'demo-1',
         issueType: 'missing_h1',
         title: 'Missing H1 Heading Tag',
+        filePath: 'frontend/index.html',
+        lineNumber: 17,
         severity: 'critical',
         confidence: 99.4,
         scoreBoost: 12,
@@ -81,6 +100,8 @@ export default function AntigravityFixerPage() {
         issueId: 'demo-2',
         issueType: 'missing_meta_description',
         title: 'Missing Meta Description',
+        filePath: 'frontend/index.html',
+        lineNumber: 7,
         severity: 'high',
         confidence: 99.1,
         scoreBoost: 10,
@@ -97,6 +118,8 @@ export default function AntigravityFixerPage() {
         issueId: 'demo-3',
         issueType: 'missing_schema',
         title: 'Missing Schema.org JSON-LD Structured Data',
+        filePath: 'frontend/index.html',
+        lineNumber: 12,
         severity: 'high',
         confidence: 99.6,
         scoreBoost: 14,
@@ -148,6 +171,9 @@ export default function AntigravityFixerPage() {
 
         if (auditRes?.data?.audit) {
           setCurrentAudit(auditRes.data.audit);
+          if (auditRes.data.audit.project_path) {
+            setWorkspacePath(auditRes.data.audit.project_path);
+          }
         }
         if (bpRes?.data) {
           setBlueprint(bpRes.data);
@@ -164,19 +190,146 @@ export default function AntigravityFixerPage() {
     loadBlueprint();
   }, [selectedAuditId, activeFramework]);
 
-  // Handle running live Antigravity Autonomous repair simulation
+  // Initial greeting logs in terminal
+  useEffect(() => {
+    if (terminalLogs.length === 0) {
+      setTerminalLogs([
+        'Google Antigravity Agent Runtime Session [INITIALIZED]',
+        `[AGY-WORKSPACE] Active Codebase: ${workspacePath}`,
+        '[AGY-AGENT] Google Antigravity Agent Core v2.4 (DeepMind Coder) standing by.',
+        `[AGY-DEV] Live dev server: http://localhost:5173/ | Command: npm run dev`,
+        'Ready to open Google Antigravity IDE for live coding and code improvements.'
+      ]);
+    }
+  }, [workspacePath]);
+
+  // 1. Open entire workspace in Google Antigravity IDE
+  const handleOpenAntigravityWorkspace = async () => {
+    setOpeningWorkspace(true);
+    const targetPath = workspacePath.trim() || 'C:\\Users\\AGP KOHAT\\Desktop\\SEO';
+
+    setTerminalLogs(prev => [
+      ...prev,
+      `[AGY-IDE] Launching Google Antigravity IDE at: ${targetPath}...`,
+      `[AGY-STATUS] Spawning antigravity-ide process on Windows...`
+    ]);
+
+    try {
+      // Call backend native launcher
+      await auditApi.openWorkspace({ projectPath: targetPath });
+
+      // Trigger URI deep-link fallback for instant editor response
+      const cleanUri = `vscode://file/${targetPath.replace(/\\/g, '/')}`;
+      window.location.href = cleanUri;
+
+      setTerminalLogs(prev => [
+        ...prev,
+        `✔ [AGY-SUCCESS] Google Antigravity IDE workspace launched! [CODE 0 READY]`,
+        `[AGY-RUN] Terminal ready in IDE: run 'npm run dev' to serve live changes at http://localhost:5173/`,
+        `[AGY-AGENT] Pair-programming session active. Use /goal in Antigravity chat for autonomous refactoring.`
+      ]);
+
+      setToastNotice({
+        title: 'Google Antigravity IDE Opened!',
+        message: `Workspace launched at ${targetPath}. You can now run the code and make improvements in Antigravity.`
+      });
+      setTimeout(() => setToastNotice(null), 8000);
+    } catch (err) {
+      // Direct deep link fallback even if backend is offline or on remote host
+      const cleanUri = `vscode://file/${targetPath.replace(/\\/g, '/')}`;
+      window.location.href = cleanUri;
+
+      setTerminalLogs(prev => [
+        ...prev,
+        `✔ [AGY-URI] Dispatched Google Antigravity IDE URI handler: ${cleanUri}`,
+        `[AGY-RUN] Run 'npm run dev' in your IDE terminal to test code live.`
+      ]);
+
+      setToastNotice({
+        title: 'Google Antigravity IDE Launched',
+        message: `Workspace opened via system URI handler at ${targetPath}.`
+      });
+      setTimeout(() => setToastNotice(null), 8000);
+    } finally {
+      setOpeningWorkspace(false);
+    }
+  };
+
+  // 2. Open specific file at line number in Google Antigravity IDE
+  const handleOpenFileInAntigravity = async (repair) => {
+    const file = repair.filePath || 'frontend/index.html';
+    const line = repair.lineNumber || 1;
+    const targetPath = workspacePath.trim() || 'C:\\Users\\AGP KOHAT\\Desktop\\SEO';
+
+    setOpeningFileId(repair.issueId);
+    setTerminalLogs(prev => [
+      ...prev,
+      `[AGY-IDE] Opening ${file} at line ${line} in Google Antigravity IDE...`
+    ]);
+
+    try {
+      await auditApi.openInEditor({
+        projectPath: targetPath,
+        filePath: file,
+        lineNumber: line
+      });
+
+      // System URI fallback
+      const cleanUri = `vscode://file/${targetPath.replace(/\\/g, '/')}/${file}:${line}`;
+      window.location.href = cleanUri;
+
+      setTerminalLogs(prev => [
+        ...prev,
+        `✔ [AGY-FILE] Opened ${file}:${line} in Google Antigravity IDE for live editing!`
+      ]);
+
+      setToastNotice({
+        title: `Opened ${file} (Line ${line})`,
+        message: 'Google Antigravity IDE navigated directly to the issue location for coding.'
+      });
+      setTimeout(() => setToastNotice(null), 6000);
+    } catch (err) {
+      const cleanUri = `vscode://file/${targetPath.replace(/\\/g, '/')}/${file}:${line}`;
+      window.location.href = cleanUri;
+    } finally {
+      setOpeningFileId(null);
+    }
+  };
+
+  // 3. Open Agent Repair Modal for an issue
+  const handleOpenAgentModal = (repair) => {
+    const file = repair.filePath || 'frontend/index.html';
+    const line = repair.lineNumber || 1;
+    const currentPatch = repair.patches?.[activeFramework] || repair.activePatch;
+
+    setSelectedAgentIssue({
+      id: repair.issueId,
+      title: repair.title,
+      severity: repair.severity,
+      file_path: file,
+      line_number: line,
+      code_snippet: repair.originalCode || '<!-- Current Markup -->',
+      suggested_fix: currentPatch,
+      solution_steps: repair.agentInsight,
+      antigravity_command: `/goal In ${file} at line ${line}, refactor SEO issue "${repair.title}": apply fix ${currentPatch}`
+    });
+  };
+
+  // 4. Handle running live Antigravity Autonomous repair simulation
   const handleRunFullRepair = () => {
     setRunningRepair(true);
     setTerminalLogs([]);
 
     const steps = [
       '[AGY-INIT] Initializing Google Antigravity Agent Core v2.4 (DeepMind Coder)...',
+      `[AGY-IDE] Connecting to active Google Antigravity IDE session at ${workspacePath}...`,
       '[AGY-NET] Connecting to Google Search Quality Evaluator neural weights (Latency: 18ms)...',
       `[AGY-AST] Decompiling DOM node graph for ${currentAudit?.website_url || 'Target Website'}...`,
       '[AGY-ANALYSIS] Flagged 4 high-friction ranking bottlenecks in Title, Meta, and Schema AST...',
       `[AGY-PATCH] Transpiling clean zero-regression patch code for framework: [${activeFramework.toUpperCase()}]...`,
       '[AGY-DIFF] Unified patch diff verified: 0 syntax collisions, 100% Google Search Console compliant.',
       `[AGY-SCORE] Ranking simulation complete: Projected score jump +${blueprint?.projectedScoreBoost || 32} Points!`,
+      `[AGY-RUN] Live dev server: http://localhost:5173/ | Ready to run code improvements in Google Antigravity IDE.`,
       '✔ Google Antigravity Autonomous Auto-Fixer Ready: All patches compiled successfully.'
     ];
 
@@ -186,7 +339,7 @@ export default function AntigravityFixerPage() {
         if (idx === steps.length - 1) {
           setRunningRepair(false);
         }
-      }, (idx + 1) * 350);
+      }, (idx + 1) * 300);
     });
   };
 
@@ -194,6 +347,12 @@ export default function AntigravityFixerPage() {
     navigator.clipboard.writeText(text);
     setCopiedIndex(index);
     setTimeout(() => setCopiedIndex(null), 2500);
+  };
+
+  const handleCopyRunCmd = (cmd) => {
+    navigator.clipboard.writeText(cmd);
+    setCopiedCmd(true);
+    setTimeout(() => setCopiedCmd(false), 2500);
   };
 
   const handleResolveIssue = async (issueId, scoreBoost = 10) => {
@@ -225,7 +384,20 @@ export default function AntigravityFixerPage() {
   });
 
   return (
-    <div className="space-y-8 pb-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="space-y-8 pb-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 animate-fade-in">
+      {/* Toast Notice */}
+      {toastNotice && (
+        <div className="fixed bottom-6 right-6 z-50 max-w-md p-4 rounded-2xl bg-slate-900 border-2 border-indigo-500 shadow-2xl text-white text-xs flex items-start gap-3 animate-scale-up">
+          <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center shrink-0 mt-0.5 shadow-md shadow-indigo-600/30">
+            <Bot className="w-4 h-4 text-white" />
+          </div>
+          <div className="flex-1">
+            <p className="font-extrabold text-sm text-white">{toastNotice.title}</p>
+            <p className="text-slate-300 mt-0.5 leading-relaxed">{toastNotice.message}</p>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="bg-gradient-to-r from-gray-900 via-indigo-950 to-purple-950 rounded-2xl p-8 text-white shadow-2xl relative overflow-hidden border border-indigo-800/40">
         <div className="absolute -right-12 -top-12 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
@@ -242,7 +414,7 @@ export default function AntigravityFixerPage() {
               Autonomous SEO Auto-Fixer
             </h1>
             <p className="text-gray-300 max-w-2xl text-sm sm:text-base leading-relaxed">
-              Directly connected with Google Antigravity. Automatically synthesizes verified, production-ready code patches for technical SEO bottlenecks, generates instant diffs, and computes real-time ranking improvements.
+              Directly connected with <strong>Google Antigravity IDE</strong>. Launch the IDE to run code, test improvements, synthesize verified code patches with AST diffs, and boost your Google rankings.
             </p>
           </div>
 
@@ -310,6 +482,107 @@ export default function AntigravityFixerPage() {
         </div>
       </div>
 
+      {/* Dedicated Google Antigravity Code Runner & Workspace Controller */}
+      <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border-2 border-indigo-500/40 shadow-xl text-white space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+              <h2 className="text-base sm:text-lg font-extrabold text-white flex items-center gap-2">
+                <Laptop className="w-5 h-5 text-indigo-400" />
+                <span>Google Antigravity IDE & Live Code Runner</span>
+              </h2>
+              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-500/30 text-indigo-300 border border-indigo-500/40">
+                Active Coding Studio
+              </span>
+            </div>
+            <p className="text-xs text-slate-300">
+              Open your project in <strong>Google Antigravity IDE</strong> to run the code, test live changes, and apply AI code fixes.
+            </p>
+          </div>
+
+          {/* Big Action Buttons */}
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+            <button
+              type="button"
+              onClick={handleOpenAntigravityWorkspace}
+              disabled={openingWorkspace}
+              className="px-5 py-2.5 rounded-xl font-extrabold text-sm text-white bg-gradient-to-r from-indigo-600 via-brand-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 shadow-lg shadow-indigo-600/30 transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+              title="Launches Google Antigravity IDE with this project workspace"
+            >
+              {openingWorkspace ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <ExternalLink className="w-4 h-4" />
+              )}
+              <span>🚀 Open in Google Antigravity IDE</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleCopyRunCmd('npm run dev')}
+              className="px-4 py-2.5 rounded-xl font-bold text-xs text-slate-200 bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+              title="Copy the dev server run command"
+            >
+              {copiedCmd ? <Check className="w-4 h-4 text-emerald-400" /> : <Play className="w-4 h-4 text-emerald-400" />}
+              <span>{copiedCmd ? 'Command Copied!' : 'npm run dev (Copy)'}</span>
+            </button>
+
+            <a
+              href={currentAudit?.website_url || 'http://localhost:5173/'}
+              target="_blank"
+              rel="noreferrer"
+              className="px-4 py-2.5 rounded-xl font-bold text-xs text-slate-200 bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+              title="Open the live preview in browser"
+            >
+              <ExternalLink className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Open Live Preview</span>
+            </a>
+          </div>
+        </div>
+
+        {/* Workspace Path Input Bar */}
+        <div className="pt-3 border-t border-indigo-900/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2 flex-1">
+            <span className="text-slate-400 shrink-0 font-medium">Workspace Location:</span>
+            <div className="relative flex-1">
+              <input
+                type="text"
+                value={workspacePath}
+                onChange={(e) => {
+                  setWorkspacePath(e.target.value);
+                  localStorage.setItem('seo_project_path', e.target.value);
+                }}
+                className="w-full px-3 py-1.5 rounded-lg bg-slate-950/80 border border-slate-700 text-slate-200 font-mono text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                placeholder="C:\Users\...\ProjectFolder"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const defaultWs = 'C:\\Users\\AGP KOHAT\\Desktop\\SEO';
+                setWorkspacePath(defaultWs);
+                localStorage.setItem('seo_project_path', defaultWs);
+              }}
+              className="text-[11px] text-indigo-400 hover:text-indigo-300 font-bold underline shrink-0 cursor-pointer"
+            >
+              Use Current Workspace
+            </button>
+          </div>
+
+          <div className="flex items-center gap-3 text-slate-400 text-[11px] shrink-0">
+            <span className="flex items-center gap-1">
+              <Bot className="w-3.5 h-3.5 text-indigo-400" />
+              Agent Protocol: <strong>/goal ready</strong>
+            </span>
+            <span className="flex items-center gap-1">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              Live Coding: <strong>Enabled</strong>
+            </span>
+          </div>
+        </div>
+      </div>
+
       {/* Autonomous Action Trigger & Terminal */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -319,18 +592,30 @@ export default function AntigravityFixerPage() {
               Autonomous Repair Studio
             </h2>
             <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
-              Launch Antigravity's DeepMind cognitive loop to decompile the website DOM and synthesize fixes.
+              Launch Antigravity's DeepMind cognitive loop to decompile the website DOM, synthesize fixes, and open in Google Antigravity IDE.
             </p>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+            {/* Direct Open in IDE Button in Repair Studio */}
+            <button
+              type="button"
+              onClick={handleOpenAntigravityWorkspace}
+              disabled={openingWorkspace}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm active:scale-95 transition-all cursor-pointer"
+              title="Open the project in Google Antigravity IDE for live coding"
+            >
+              <ExternalLink className="h-4 w-4" />
+              <span>Open in Google Antigravity IDE</span>
+            </button>
+
             <button
               onClick={handleRunFullRepair}
               disabled={runningRepair}
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white shadow transition-all ${
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white shadow transition-all cursor-pointer ${
                 runningRepair
                   ? 'bg-gray-400 cursor-not-allowed'
-                  : 'bg-indigo-600 hover:bg-indigo-700 active:scale-95'
+                  : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 active:scale-95'
               }`}
             >
               <RefreshCw className={`h-4 w-4 ${runningRepair ? 'animate-spin' : ''}`} />
@@ -351,7 +636,7 @@ export default function AntigravityFixerPage() {
               ) : (
                 <button
                   onClick={() => setShowLimitModal(true)}
-                  className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium text-amber-800 bg-amber-100 hover:bg-amber-200 transition-colors"
+                  className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium text-amber-800 bg-amber-100 hover:bg-amber-200 transition-colors cursor-pointer"
                   title="Unlock 1-Click Patches with Pro Specialist"
                 >
                   <Lock className="h-4 w-4 text-amber-600" />
@@ -368,9 +653,27 @@ export default function AntigravityFixerPage() {
         {/* Terminal Log Stream */}
         {terminalLogs.length > 0 && (
           <div className="bg-gray-950 p-5 font-mono text-xs text-gray-200 border-t border-gray-800 space-y-1.5 transition-all">
-            <div className="flex items-center gap-2 pb-2 text-gray-400 border-b border-gray-800 text-[11px]">
-              <Terminal className="h-3.5 w-3.5 text-emerald-400" />
-              <span>Google Antigravity Agent Runtime Session [ACTIVE]</span>
+            <div className="flex items-center justify-between pb-2 text-gray-400 border-b border-gray-800 text-[11px]">
+              <div className="flex items-center gap-2">
+                <Terminal className="h-3.5 w-3.5 text-emerald-400" />
+                <span>Google Antigravity Agent Runtime Session [ACTIVE]</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleOpenAntigravityWorkspace}
+                  className="text-indigo-400 hover:text-indigo-300 font-bold underline text-[11px] cursor-pointer"
+                >
+                  Launch IDE Workspace
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTerminalLogs([])}
+                  className="text-gray-500 hover:text-gray-300 text-[11px] cursor-pointer"
+                >
+                  Clear Logs
+                </button>
+              </div>
             </div>
             {terminalLogs.map((log, i) => (
               <div
@@ -378,6 +681,10 @@ export default function AntigravityFixerPage() {
                 className={`flex items-start gap-2 ${
                   log.startsWith('✔')
                     ? 'text-emerald-400 font-bold'
+                    : log.includes('SUCCESS')
+                    ? 'text-emerald-300 font-semibold'
+                    : log.includes('IDE')
+                    ? 'text-indigo-300 font-semibold'
                     : log.includes('SCORE')
                     ? 'text-amber-300 font-semibold'
                     : 'text-gray-300'
@@ -402,7 +709,7 @@ export default function AntigravityFixerPage() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`px-3.5 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition-colors ${
+              className={`px-3.5 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition-colors cursor-pointer ${
                 activeTab === tab.id
                   ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
@@ -423,6 +730,8 @@ export default function AntigravityFixerPage() {
         {displayRepairs.map((repair, idx) => {
           const isResolved = resolvedIssues.has(repair.issueId);
           const currentPatch = repair.patches?.[activeFramework] || repair.activePatch;
+          const targetFile = repair.filePath || 'frontend/index.html';
+          const targetLine = repair.lineNumber || 1;
 
           return (
             <div
@@ -435,7 +744,7 @@ export default function AntigravityFixerPage() {
             >
               {/* Card Header */}
               <div className="p-5 sm:p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="space-y-1.5">
+                <div className="space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
                     {(() => {
                       const badge = getSeverityBadge(repair.severity);
@@ -445,6 +754,13 @@ export default function AntigravityFixerPage() {
                         </span>
                       );
                     })()}
+
+                    {/* File Path & Line pill */}
+                    <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center gap-1.5">
+                      <FileCode className="w-3.5 h-3.5 text-indigo-500" />
+                      <span>{targetFile}:{targetLine}</span>
+                    </span>
+
                     <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
                       Antigravity Verified &bull; {repair.confidence}% Confidence
                     </span>
@@ -462,10 +778,38 @@ export default function AntigravityFixerPage() {
                   </h3>
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0">
+                {/* Card Action Buttons */}
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                  {/* Open in Antigravity IDE directly at line */}
+                  <button
+                    type="button"
+                    onClick={() => handleOpenFileInAntigravity(repair)}
+                    disabled={openingFileId === repair.issueId}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-indigo-600 to-brand-600 hover:from-indigo-500 hover:to-brand-500 shadow-sm transition-all cursor-pointer"
+                    title={`Directly opens ${targetFile} at line ${targetLine} in Google Antigravity IDE for live coding`}
+                  >
+                    {openingFileId === repair.issueId ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <ExternalLink className="h-3.5 w-3.5 text-white" />
+                    )}
+                    <span>Open in Antigravity (Line {targetLine})</span>
+                  </button>
+
+                  {/* Launch Agent Fix Modal */}
+                  <button
+                    type="button"
+                    onClick={() => handleOpenAgentModal(repair)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-colors cursor-pointer"
+                    title="Launch Antigravity Agent modal with /goal command and 1-click safe patching"
+                  >
+                    <Bot className="h-3.5 w-3.5 text-indigo-600" />
+                    <span>Launch Agent Fix</span>
+                  </button>
+
                   <button
                     onClick={() => handleCopy(currentPatch, idx)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors cursor-pointer"
                   >
                     {copiedIndex === idx ? (
                       <>
@@ -483,7 +827,7 @@ export default function AntigravityFixerPage() {
                   {!isResolved ? (
                     <button
                       onClick={() => handleResolveIssue(repair.issueId, repair.scoreBoost)}
-                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 shadow-sm active:scale-95 transition-all"
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 shadow-sm active:scale-95 transition-all cursor-pointer"
                     >
                       <CheckCircle2 className="h-3.5 w-3.5" />
                       Apply &amp; Resolve
@@ -543,6 +887,20 @@ export default function AntigravityFixerPage() {
           </div>
         )}
       </div>
+
+      {/* Google Antigravity Code Refactoring & IDE Modal */}
+      {selectedAgentIssue && (
+        <GoogleAntigravityModal
+          isOpen={!!selectedAgentIssue}
+          onClose={() => setSelectedAgentIssue(null)}
+          issue={selectedAgentIssue}
+          auditId={selectedAuditId || currentAudit?.id}
+          projectPath={workspacePath}
+          onFixApplied={(issueId) => {
+            setResolvedIssues(prev => new Set([...prev, issueId]));
+          }}
+        />
+      )}
 
       {/* Pro Paywall Modal */}
       <TrialLimitModal

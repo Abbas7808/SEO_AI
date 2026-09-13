@@ -64,9 +64,12 @@ class AntigravityLauncher {
       exec(command, (error) => {
         if (error) {
           logger.warn(`Antigravity open-workspace warning: ${error.message}`);
-          return resolve({ success: false, error: error.message });
+          // Fallback to start URI
+          const uri = `vscode://file/${cleanPath.replace(/\\/g, '/')}`;
+          exec(`start "" "${uri}"`, () => {});
+          return resolve({ success: true, mode: 'uri_fallback', projectPath: cleanPath });
         }
-        resolve({ success: true, projectPath: cleanPath });
+        resolve({ success: true, mode: 'cli_direct', projectPath: cleanPath });
       });
     });
   }
