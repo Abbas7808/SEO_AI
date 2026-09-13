@@ -156,65 +156,28 @@ export function isProjectOwner(userEmail = '') {
  * Get active user plan status ('free' | 'pro' | 'agency')
  */
 export function getUserPlan(userEmail = '') {
-  // Project owner Munim Abbas has permanent top-tier Enterprise/Agency plan
-  if (isProjectOwner(userEmail)) {
-    return 'agency';
-  }
-
-  try {
-    // 1. Check if user is manually granted pro in approved members list
-    const approvedMembers = JSON.parse(localStorage.getItem('seo_approved_members') || '{}');
-    const email = userEmail.toLowerCase().trim();
-
-    if (email && approvedMembers[email]) {
-      return approvedMembers[email].plan || 'pro';
-    }
-
-    // 2. Check active user profile stored in localStorage
-    const activeUser = JSON.parse(localStorage.getItem('seo_user') || 'null');
-    if (activeUser?.plan) {
-      return activeUser.plan;
-    }
-    if (activeUser?.email && approvedMembers[activeUser.email.toLowerCase().trim()]) {
-      return approvedMembers[activeUser.email.toLowerCase().trim()].plan || 'pro';
-    }
-
-    // 3. Check persistent device plan
-    const devicePlan = localStorage.getItem('seo_device_plan');
-    if (devicePlan && devicePlan !== 'free') {
-      return devicePlan;
-    }
-  } catch (e) {}
-
-  return 'free';
+  return 'agency';
 }
 
 /**
  * Get count of project audits conducted so far
  */
 export function getTrialUsage(userEmail = '') {
-  const isOwner = isProjectOwner(userEmail);
-  const plan = isOwner ? 'agency' : getUserPlan(userEmail);
-  const isPro = isOwner || plan === 'pro' || plan === 'agency';
-
   let auditsCount = 0;
   try {
     const list = JSON.parse(localStorage.getItem('seo_audits_list') || '[]');
     auditsCount = list.length;
   } catch (e) {}
 
-  const auditsRemaining = isPro ? 999999 : Math.max(0, MAX_FREE_AUDITS - auditsCount);
-  const isLimitReached = !isPro && auditsCount >= MAX_FREE_AUDITS;
-
   return {
-    plan,
-    isPro,
-    isOwner,
+    plan: 'agency',
+    isPro: true,
+    isOwner: true,
     auditsCount,
-    maxFreeAudits: MAX_FREE_AUDITS,
-    auditsRemaining,
-    isLimitReached,
-    percentageUsed: isPro ? 100 : Math.min(100, Math.round((auditsCount / MAX_FREE_AUDITS) * 100))
+    maxFreeAudits: 999999,
+    auditsRemaining: 999999,
+    isLimitReached: false,
+    percentageUsed: 0
   };
 }
 
@@ -222,9 +185,7 @@ export function getTrialUsage(userEmail = '') {
  * Check if the user is allowed to start a new audit
  */
 export function canPerformAudit(userEmail = '') {
-  if (isProjectOwner(userEmail)) return true;
-  const usage = getTrialUsage(userEmail);
-  return !usage.isLimitReached;
+  return true;
 }
 
 /**

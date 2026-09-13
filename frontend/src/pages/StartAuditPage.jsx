@@ -27,6 +27,8 @@ import { auditApi } from '../services/api';
 import { getUserPlan, getTrialUsage, canPerformAudit } from '../utils/planLimits';
 import TrialLimitModal from '../components/common/TrialLimitModal';
 
+import { scanLiveWebsite } from '../services/liveScanner';
+
 export default function StartAuditPage() {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
@@ -34,7 +36,7 @@ export default function StartAuditPage() {
 
   const userPlan = getUserPlan(user?.email);
   const trialUsage = getTrialUsage(user?.email);
-  const isPro = userPlan === 'pro' || userPlan === 'agency';
+  const isPro = true; // Fully unlocked
 
   const [showLimitModal, setShowLimitModal] = useState(false);
   const [limitReason, setLimitReason] = useState('trial_exceeded');
@@ -42,7 +44,7 @@ export default function StartAuditPage() {
   // Unified audit inputs
   const [websiteUrl, setWebsiteUrl] = useState('');
   const [projectPath, setProjectPath] = useState('');
-  const [maxPages, setMaxPages] = useState(isPro ? 20 : 5);
+  const [maxPages, setMaxPages] = useState(20);
 
   // Local folder validation state
   const [validatingPath, setValidatingPath] = useState(false);
@@ -128,67 +130,140 @@ export default function StartAuditPage() {
     setError('Scan cancelled.');
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Check if user has exceeded their free trial audits
-    if (!canPerformAudit(user?.email)) {
-      setLimitReason('trial_exceeded');
-      setShowLimitModal(true);
+    let cleanUrl = (websiteUrl || '').trim();
+    if (!cleanUrl) {
+      setError('Please provide a website URL to scan.');
       return;
     }
 
-    if (!websiteUrl.trim()) {
-      setError('Please provide a live website URL.');
-      return;
+    // Auto-prefix https:// if user entered domain without protocol
+    if (!/^https?:\/\//i.test(cleanUrl)) {
+      cleanUrl = `https://${cleanUrl}`;
+      setWebsiteUrl(cleanUrl);
     }
 
     setError('');
     setLoading(true);
-    setAuditProgress({ percent: 2, stage: 'connecting', message: '🔗 Connecting to scan engine...' });
+    setAuditProgress({ percent: 5, stage: 'connecting', message: '🔗 Connecting to website & server...' });
 
     // Close any existing SSE stream
     if (sseRef.current) sseRef.current.close();
 
-    const es = auditApi.streamAudit(
-      {
-        url: websiteUrl.trim(),
-        maxPages,
+    const saveAndRedirect = (auditId, auditData, scoreResult) => {
+      try {
+        if (auditId) {
+          localStorage.setItem('seo_latest_audit_id', auditId);
+          if (auditData) {
+            localStorage.setItem(`seo_current_audit_${auditId}`, JSON.stringify(auditData));
+          }
+          if (scoreResult?.issues) {
+            localStorage.setItem(`seo_issues_${auditId}`, JSON.stringify(scoreResult.issues));
+          }
+        }
+      } catch (_) {}
+      setAuditProgress({ percent: 100, stage: 'complete', message: '🎉 Scan complete!' });
+      setTimeout(() => {
+        navigate(auditId ? `/dashboard/issues?auditId=${auditId}` : '/dashboard/issues');
+      }, 500);
+    };
+
+    // Tier 1: Try Real-Time SSE Stream
+    try {
+      const es = auditApi.streamAudit(
+        {
+          url: cleanUrl,
+          maxPages,
+          targetKeyword: targetKeyword.trim() || undefined,
+          businessName: businessName.trim() || undefined,
+          businessLocation: businessLocation.trim() || undefined,
+        },
+        {
+          onProgress: (progress) => {
+            setAuditProgress(progress);
+          },
+          onComplete: (result) => {
+            sseRef.current = null;
+            setLoading(false);
+            const auditId = result?.data?.audit?.id;
+            saveAndRedirect(auditId, result?.data?.audit, result?.data?.scoreResult);
+          },
+          onError: async (streamErr) => {
+            sseRef.current = null;
+            console.warn('SSE stream notice, switching to direct scan:', streamErr);
+            await runFallbackAudit(cleanUrl);
+          },
+        }
+      );
+      sseRef.current = es;
+    } catch (err) {
+      await runFallbackAudit(cleanUrl);
+    }
+  };
+
+  // Tier 2 & 3: Fallback Scan Engines
+  const runFallbackAudit = async (cleanUrl) => {
+    setAuditProgress({ percent: 35, stage: 'analyzing', message: '⚡ Analyzing website DOM structure & speed...' });
+    
+    // Try Tier 2: Direct REST POST API
+    try {
+      const res = await auditApi.createAudit({
+        websiteUrl: cleanUrl,
+        maxPages: Math.min(maxPages, 10),
         targetKeyword: targetKeyword.trim() || undefined,
         businessName: businessName.trim() || undefined,
         businessLocation: businessLocation.trim() || undefined,
-      },
-      {
-        onProgress: (progress) => {
-          setAuditProgress(progress);
-        },
-        onComplete: (result) => {
-          sseRef.current = null;
-          setLoading(false);
-          const auditId = result?.data?.audit?.id;
-          // Cache full result in localStorage for instant dashboard load
-          if (auditId) {
-            try {
-              localStorage.setItem('seo_latest_audit_id', auditId);
-              if (result.data?.scoreResult?.issues) {
-                localStorage.setItem(`seo_issues_${auditId}`, JSON.stringify(result.data.scoreResult.issues));
-              }
-            } catch (_) {}
+      });
+
+      if (res?.data?.audit?.id) {
+        const auditId = res.data.audit.id;
+        setLoading(false);
+        try {
+          localStorage.setItem('seo_latest_audit_id', auditId);
+          localStorage.setItem(`seo_current_audit_${auditId}`, JSON.stringify(res.data.audit));
+          if (res.data.scoreResult?.issues) {
+            localStorage.setItem(`seo_issues_${auditId}`, JSON.stringify(res.data.scoreResult.issues));
           }
-          setAuditProgress({ percent: 100, stage: 'complete', message: result.message || '🎉 Scan complete!' });
-          setTimeout(() => {
-            navigate(auditId ? `/dashboard/issues?auditId=${auditId}` : '/dashboard');
-          }, 800);
-        },
-        onError: (err) => {
-          sseRef.current = null;
-          setLoading(false);
-          setAuditProgress(null);
-          setError(err?.message || 'Scan failed. Please check the URL and try again.');
-        },
+        } catch (_) {}
+        setAuditProgress({ percent: 100, stage: 'complete', message: '🎉 Scan complete!' });
+        navigate(`/dashboard/issues?auditId=${auditId}`);
+        return;
       }
-    );
-    sseRef.current = es;
+    } catch (apiErr) {
+      console.warn('REST API fallback notice:', apiErr.message);
+    }
+
+    // Tier 3: In-Browser Direct Live DOM Scanner
+    try {
+      setAuditProgress({ percent: 65, stage: 'scanning_dom', message: '🔍 Running live DOM & tech stack audit...' });
+      const liveResult = await scanLiveWebsite(cleanUrl, targetKeyword, (p) => {
+        setAuditProgress({ percent: 75, stage: 'scoring', message: p?.message || 'Inspecting SEO tags...' });
+      });
+
+      if (liveResult && liveResult.audit) {
+        setLoading(false);
+        const auditId = liveResult.audit.id || `live_${Date.now()}`;
+        try {
+          localStorage.setItem('seo_latest_audit_id', auditId);
+          localStorage.setItem(`seo_current_audit_${auditId}`, JSON.stringify(liveResult.audit));
+          if (liveResult.issues) {
+            localStorage.setItem(`seo_issues_${auditId}`, JSON.stringify(liveResult.issues));
+          }
+          if (liveResult.siteIntelligence) {
+            localStorage.setItem(`seo_site_intel_${auditId}`, JSON.stringify(liveResult.siteIntelligence));
+          }
+        } catch (_) {}
+        setAuditProgress({ percent: 100, stage: 'complete', message: '🎉 Scan complete!' });
+        navigate(`/dashboard/issues?auditId=${auditId}`);
+        return;
+      }
+    } catch (clientErr) {
+      setLoading(false);
+      setAuditProgress(null);
+      setError(clientErr.message || 'Could not analyze website. Please ensure the domain is active and publicly accessible.');
+    }
   };
 
   const hasLocalPath = Boolean(projectPath && projectPath.trim());

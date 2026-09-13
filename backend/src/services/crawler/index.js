@@ -74,7 +74,7 @@ class CrawlerService {
     this.maxPages            = Math.min(Math.max(parseInt(options.maxPages, 10) || 20, 1), 100);
     this.timeout             = options.timeout || 10000;
     this.concurrency         = Math.min(options.concurrency || 5, 8);
-    this.userAgent           = options.userAgent || 'AI-SEO-Auditor-Bot/2.0 (+https://aiseoauditor.local)';
+    this.userAgent           = options.userAgent || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 (compatible; SiteGlowBot/2.0)';
     this.maxRedirects        = 5;
     this.maxContentSizeBytes = 5 * 1024 * 1024;
     this.bypassCache         = options.bypassCache || false;
