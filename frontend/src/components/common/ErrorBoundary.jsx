@@ -13,10 +13,28 @@ export default class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, errorInfo) {
     console.error('Uncaught error in component tree:', error, errorInfo);
+
+    // If dynamic chunk import failed due to a new Vercel deployment with updated hashes, auto-refresh once
+    const msg = error?.message || '';
+    if (
+      msg.includes('Failed to fetch dynamically imported module') ||
+      msg.includes('error loading dynamically imported module') ||
+      msg.includes('Importing a module script failed')
+    ) {
+      const alreadyRetried = sessionStorage.getItem('chunk_retry_attempt');
+      if (!alreadyRetried) {
+        sessionStorage.setItem('chunk_retry_attempt', 'true');
+        window.location.reload();
+      }
+    }
   }
 
   render() {
     if (this.state.hasError) {
+      const isChunkError =
+        this.state.error?.message?.includes('dynamically imported module') ||
+        this.state.error?.message?.includes('Importing a module script failed');
+
       return (
         <div className="min-h-[60vh] flex items-center justify-center p-6 text-center">
           <div className="max-w-md w-full p-8 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl space-y-5">
@@ -25,16 +43,21 @@ export default class ErrorBoundary extends React.Component {
             </div>
             <div>
               <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-                Something went wrong
+                {isChunkError ? 'New App Version Available' : 'Something went wrong'}
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                {this.state.error?.message || 'An unexpected error occurred while loading this view.'}
+                {isChunkError
+                  ? 'A new optimized version has been deployed. Please reload the page to load the latest high-speed module.'
+                  : (this.state.error?.message || 'An unexpected error occurred while loading this view.')}
               </p>
             </div>
             <div className="flex items-center justify-center gap-3">
               <button
                 type="button"
-                onClick={() => window.location.reload()}
+                onClick={() => {
+                  sessionStorage.removeItem('chunk_retry_attempt');
+                  window.location.reload();
+                }}
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-500 transition"
               >
                 <RefreshCw className="w-3.5 h-3.5" />

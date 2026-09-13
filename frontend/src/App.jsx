@@ -7,26 +7,51 @@ import ScrollProgressBar from './components/common/ScrollProgressBar';
 import ScrollToTop from './components/common/ScrollToTop';
 import { autoPruneStaleCache } from './utils/cacheManager';
 
-// Dynamic Code-Splitting: Lazy load pages to drastically reduce initial bundle size
-const LandingPage = lazy(() => import('./pages/LandingPage'));
-const LoginPage = lazy(() => import('./pages/LoginPage'));
-const RegisterPage = lazy(() => import('./pages/RegisterPage'));
+// Safe Dynamic Code-Splitting with auto-recovery for new deployments
+function lazyWithRetry(componentImport) {
+  return lazy(async () => {
+    try {
+      const component = await componentImport();
+      sessionStorage.removeItem('chunk_retry_attempt');
+      return component;
+    } catch (error) {
+      const msg = error?.message || '';
+      if (
+        msg.includes('Failed to fetch dynamically imported module') ||
+        msg.includes('error loading dynamically imported module') ||
+        msg.includes('Importing a module script failed')
+      ) {
+        const alreadyRetried = sessionStorage.getItem('chunk_retry_attempt');
+        if (!alreadyRetried) {
+          sessionStorage.setItem('chunk_retry_attempt', 'true');
+          window.location.reload();
+          return new Promise(() => {}); // hold promise until reload triggers
+        }
+      }
+      throw error;
+    }
+  });
+}
 
-const DashboardOverview = lazy(() => import('./pages/DashboardOverview'));
-const StartAuditPage = lazy(() => import('./pages/StartAuditPage'));
-const IssuesPage = lazy(() => import('./pages/IssuesPage'));
-const PageAnalysisPage = lazy(() => import('./pages/PageAnalysisPage'));
-const RoadmapPage = lazy(() => import('./pages/RoadmapPage'));
-const BacklitWordsPage = lazy(() => import('./pages/BacklitWordsPage'));
-const AntigravityFixerPage = lazy(() => import('./pages/AntigravityFixerPage'));
-const SiteInspectorPage = lazy(() => import('./pages/SiteInspectorPage'));
-const CompetitorComparePage = lazy(() => import('./pages/CompetitorComparePage'));
-const AIConsultantPage = lazy(() => import('./pages/AIConsultantPage'));
-const ContentOptimizerPage = lazy(() => import('./pages/ContentOptimizerPage'));
-const AuditHistoryPage = lazy(() => import('./pages/AuditHistoryPage'));
-const ReportsPage = lazy(() => import('./pages/ReportsPage'));
-const UpgradePage = lazy(() => import('./pages/UpgradePage'));
-const AdminBillingPage = lazy(() => import('./pages/AdminBillingPage'));
+const LandingPage = lazyWithRetry(() => import('./pages/LandingPage'));
+const LoginPage = lazyWithRetry(() => import('./pages/LoginPage'));
+const RegisterPage = lazyWithRetry(() => import('./pages/RegisterPage'));
+
+const DashboardOverview = lazyWithRetry(() => import('./pages/DashboardOverview'));
+const StartAuditPage = lazyWithRetry(() => import('./pages/StartAuditPage'));
+const IssuesPage = lazyWithRetry(() => import('./pages/IssuesPage'));
+const PageAnalysisPage = lazyWithRetry(() => import('./pages/PageAnalysisPage'));
+const RoadmapPage = lazyWithRetry(() => import('./pages/RoadmapPage'));
+const BacklitWordsPage = lazyWithRetry(() => import('./pages/BacklitWordsPage'));
+const AntigravityFixerPage = lazyWithRetry(() => import('./pages/AntigravityFixerPage'));
+const SiteInspectorPage = lazyWithRetry(() => import('./pages/SiteInspectorPage'));
+const CompetitorComparePage = lazyWithRetry(() => import('./pages/CompetitorComparePage'));
+const AIConsultantPage = lazyWithRetry(() => import('./pages/AIConsultantPage'));
+const ContentOptimizerPage = lazyWithRetry(() => import('./pages/ContentOptimizerPage'));
+const AuditHistoryPage = lazyWithRetry(() => import('./pages/AuditHistoryPage'));
+const ReportsPage = lazyWithRetry(() => import('./pages/ReportsPage'));
+const UpgradePage = lazyWithRetry(() => import('./pages/UpgradePage'));
+const AdminBillingPage = lazyWithRetry(() => import('./pages/AdminBillingPage'));
 
 export default function App() {
   const navigate = useNavigate();
