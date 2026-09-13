@@ -73,6 +73,30 @@ async function initDatabase() {
       logger.warn(`SEO issues column check note: ${e.message}`);
     }
 
+    // Step 5: Agency platform migrations (client_id, project_id, user agency branding)
+    try {
+      const [clientCol] = await pool.query("SHOW COLUMNS FROM audits LIKE 'client_id'");
+      if (clientCol.length === 0) {
+        await pool.query("ALTER TABLE audits ADD COLUMN client_id INT NULL AFTER user_id");
+        await pool.query("ALTER TABLE audits ADD COLUMN project_id INT NULL AFTER client_id");
+        logger.info('Audits table migrated with client_id and project_id columns.');
+      }
+    } catch (e) { logger.warn(`Agency audit migration: ${e.message}`); }
+
+    try {
+      const [agencyCol] = await pool.query("SHOW COLUMNS FROM users LIKE 'agency_name'");
+      if (agencyCol.length === 0) {
+        await pool.query("ALTER TABLE users ADD COLUMN agency_name VARCHAR(255) NULL DEFAULT 'SEO Pro Agency' AFTER password");
+        await pool.query("ALTER TABLE users ADD COLUMN agency_logo_url VARCHAR(2048) NULL AFTER agency_name");
+        await pool.query("ALTER TABLE users ADD COLUMN agency_email VARCHAR(255) NULL AFTER agency_logo_url");
+        await pool.query("ALTER TABLE users ADD COLUMN agency_phone VARCHAR(50) NULL AFTER agency_email");
+        await pool.query("ALTER TABLE users ADD COLUMN agency_color VARCHAR(20) NULL DEFAULT '#6366f1' AFTER agency_phone");
+        await pool.query("ALTER TABLE users ADD COLUMN agency_tagline VARCHAR(255) NULL AFTER agency_color");
+        await pool.query("ALTER TABLE users ADD COLUMN default_currency VARCHAR(10) NULL DEFAULT 'PKR' AFTER agency_tagline");
+        logger.info('Users table migrated with agency branding columns.');
+      }
+    } catch (e) { logger.warn(`Agency user migration: ${e.message}`); }
+
     return pool;
   } catch (error) {
     logger.error('Failed to initialize database:', error.message);

@@ -4,6 +4,7 @@ const router = express.Router();
 const healthRoutes = require('./healthRoutes');
 const authRoutes = require('./authRoutes');
 const auditRoutes = require('./auditRoutes');
+const agencyRoutes = require('./agencyRoutes');
 const aiController = require('../controllers/aiController');
 const reportController = require('../controllers/reportController');
 const { optionalAuth } = require('../middleware/authMiddleware');
@@ -11,6 +12,7 @@ const { optionalAuth } = require('../middleware/authMiddleware');
 router.use('/health', healthRoutes);
 router.use('/auth', authRoutes);
 router.use('/audits', auditRoutes);
+router.use('/agency', agencyRoutes);
 
 // AI Service Routes
 router.post('/ai/analyze', optionalAuth, aiController.analyze);

@@ -52,6 +52,12 @@ const AuditHistoryPage = lazyWithRetry(() => import('./pages/AuditHistoryPage'))
 const ReportsPage = lazyWithRetry(() => import('./pages/ReportsPage'));
 const UpgradePage = lazyWithRetry(() => import('./pages/UpgradePage'));
 const AdminBillingPage = lazyWithRetry(() => import('./pages/AdminBillingPage'));
+const ClientsHubPage = lazyWithRetry(() => import('./pages/ClientsHubPage'));
+const KeywordTrackerPage = lazyWithRetry(() => import('./pages/KeywordTrackerPage'));
+const ProposalsPage = lazyWithRetry(() => import('./pages/ProposalsPage'));
+const InvoicesPage = lazyWithRetry(() => import('./pages/InvoicesPage'));
+const SEOToolboxPage = lazyWithRetry(() => import('./pages/SEOToolboxPage'));
+const ClientPortalPage = lazyWithRetry(() => import('./pages/ClientPortalPage'));
 
 export default function App() {
   const navigate = useNavigate();
@@ -80,6 +86,9 @@ export default function App() {
           {/* Quick-Access Admin Short Route */}
           <Route path="/admin" element={<Navigate to="/dashboard/admin-billing" replace />} />
 
+          {/* Public Client White-Label Portal Route (No login required) */}
+          <Route path="/portal/:token" element={<ClientPortalPage />} />
+
           {/* Public Marketing & Auth Views */}
           <Route path="/" element={<MainLayout />}>
             <Route index element={<LandingPage />} />
@@ -90,6 +99,11 @@ export default function App() {
           {/* Dashboard & Workspace Views */}
           <Route path="/dashboard" element={<DashboardLayout />}>
             <Route index element={<DashboardOverview />} />
+            <Route path="clients" element={<ClientsHubPage />} />
+            <Route path="keywords" element={<KeywordTrackerPage />} />
+            <Route path="proposals" element={<ProposalsPage />} />
+            <Route path="invoices" element={<InvoicesPage />} />
+            <Route path="toolbox" element={<SEOToolboxPage />} />
             <Route path="new" element={<StartAuditPage />} />
             <Route path="roadmap" element={<RoadmapPage />} />
             <Route path="antigravity" element={<AntigravityFixerPage />} />

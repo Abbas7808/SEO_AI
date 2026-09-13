@@ -20,7 +20,10 @@ import {
   Cpu,
   Crown,
   ShieldCheck,
-  CreditCard
+  CreditCard,
+  Users,
+  Target,
+  Wrench
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { getUserPlan, getTrialUsage, isProjectOwner } from '../../utils/planLimits';
@@ -38,6 +41,11 @@ export default function Sidebar({ mobileOpen, setMobileOpen }) {
 
   const navItems = [
     { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true },
+    { to: '/dashboard/clients', label: 'Clients & CRM', icon: Users, badge: 'Agency' },
+    { to: '/dashboard/keywords', label: 'Keyword Tracker', icon: Target, badge: 'SERP' },
+    { to: '/dashboard/proposals', label: 'Proposals & Pitches', icon: Sparkles, badge: 'Win Clients' },
+    { to: '/dashboard/invoices', label: 'Invoices & Billing', icon: CreditCard, badge: 'Income' },
+    { to: '/dashboard/toolbox', label: 'SEO Agency Toolbox', icon: Wrench, badge: 'Tools' },
     { to: '/dashboard/new', label: 'Start Audit', icon: Search },
     { to: '/dashboard/billing', label: 'Billing & Upgrade', icon: Crown, badge: isOwner ? 'Owner' : isPro ? 'Pro' : `${trialUsage.auditsRemaining} Left` },
     { to: '/dashboard/admin-billing', label: 'Admin Approvals', icon: ShieldCheck, badge: isOwner ? 'Owner' : undefined },

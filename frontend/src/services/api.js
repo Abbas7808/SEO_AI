@@ -216,8 +216,106 @@ export const antigravityApi = {
   },
 };
 
+export const agencyApi = {
+  // Clients CRM
+  getClients: (config) => cachedGet('/agency/clients', config, 15000),
+  getClientById: (id) => cachedGet(`/agency/clients/${id}`, {}, 15000),
+  createClient: async (data) => {
+    clearApiCache('/agency/clients');
+    return api.post('/agency/clients', data);
+  },
+  updateClient: async (id, data) => {
+    clearApiCache('/agency/clients');
+    return api.put(`/agency/clients/${id}`, data);
+  },
+  deleteClient: async (id) => {
+    clearApiCache('/agency/clients');
+    return api.delete(`/agency/clients/${id}`);
+  },
+  getProjects: (clientId) => cachedGet(`/agency/clients/${clientId}/projects`, {}, 15000),
+  createProject: async (clientId, data) => {
+    clearApiCache('/agency/clients');
+    return api.post(`/agency/clients/${clientId}/projects`, data);
+  },
+
+  // Keywords
+  getKeywords: (params) => cachedGet('/agency/keywords', { params }, 15000),
+  addKeyword: async (data) => {
+    clearApiCache('/agency/keywords');
+    return api.post('/agency/keywords', data);
+  },
+  getKeywordHistory: (id) => cachedGet(`/agency/keywords/${id}/history`, {}, 15000),
+  removeKeyword: async (id) => {
+    clearApiCache('/agency/keywords');
+    return api.delete(`/agency/keywords/${id}`);
+  },
+  trackAllKeywords: async () => {
+    clearApiCache('/agency/keywords');
+    return api.post('/agency/keywords/track-all');
+  },
+
+  // Schedules
+  getSchedules: () => cachedGet('/agency/schedules', {}, 15000),
+  createSchedule: async (data) => {
+    clearApiCache('/agency/schedules');
+    return api.post('/agency/schedules', data);
+  },
+  toggleSchedule: async (id, isActive) => {
+    clearApiCache('/agency/schedules');
+    return api.put(`/agency/schedules/${id}/toggle`, { isActive });
+  },
+  deleteSchedule: async (id) => {
+    clearApiCache('/agency/schedules');
+    return api.delete(`/agency/schedules/${id}`);
+  },
+
+  // Trends
+  getScoreHistory: (params) => cachedGet('/agency/trends/scores', { params }, 15000),
+  getIssuesTrend: (params) => cachedGet('/agency/trends/issues', { params }, 15000),
+
+  // Proposals
+  getProposals: (params) => cachedGet('/agency/proposals', { params }, 15000),
+  createProposal: async (data) => {
+    clearApiCache('/agency/proposals');
+    return api.post('/agency/proposals', data);
+  },
+  updateProposal: async (id, data) => {
+    clearApiCache('/agency/proposals');
+    return api.put(`/agency/proposals/${id}`, data);
+  },
+  deleteProposal: async (id) => {
+    clearApiCache('/agency/proposals');
+    return api.delete(`/agency/proposals/${id}`);
+  },
+
+  // Invoices
+  getInvoices: (params) => cachedGet('/agency/invoices', { params }, 15000),
+  createInvoice: async (data) => {
+    clearApiCache('/agency/invoices');
+    return api.post('/agency/invoices', data);
+  },
+  updateInvoice: async (id, data) => {
+    clearApiCache('/agency/invoices');
+    return api.put(`/agency/invoices/${id}`, data);
+  },
+  deleteInvoice: async (id) => {
+    clearApiCache('/agency/invoices');
+    return api.delete(`/agency/invoices/${id}`);
+  },
+
+  // Portal
+  generatePortalLink: async (data) => api.post('/agency/portal/generate', data),
+  getPortalLinks: () => cachedGet('/agency/portal/links', {}, 15000),
+  getPortalData: (token) => api.get(`/agency/portal/${token}`),
+
+  // Tools
+  generateSchema: (data) => api.post('/agency/tools/schema', data),
+  validateSitemap: (data) => api.post('/agency/tools/sitemap-validate', data),
+};
+
 export const healthApi = {
   check: () => cachedGet('/health', {}, 10000),
 };
 
 export default api;
+
