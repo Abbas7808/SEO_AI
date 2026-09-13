@@ -14,11 +14,16 @@ export default defineConfig({
       }
     }
   },
+  esbuild: {
+    legalComments: 'none',
+    treeShaking: true,
+  },
   build: {
-    target: 'esnext',
+    target: 'es2020',
     minify: 'esbuild',
     cssCodeSplit: true,
     chunkSizeWarningLimit: 1200,
+    reportCompressedSize: true,
     rollupOptions: {
       output: {
         manualChunks(id) {

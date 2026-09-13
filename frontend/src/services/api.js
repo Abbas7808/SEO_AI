@@ -32,21 +32,86 @@ api.interceptors.response.use(
   }
 );
 
+// Ultra-Fast In-Memory SWR (Stale-While-Revalidate) Cache Store
+const fastCache = new Map();
+const DEFAULT_TTL = 45000; // 45 seconds fresh
+
+export const getCacheMetrics = () => ({
+  size: fastCache.size,
+  keys: Array.from(fastCache.keys()),
+});
+
+export const clearApiCache = (filterPattern = null) => {
+  if (!filterPattern) {
+    fastCache.clear();
+    return;
+  }
+  for (const key of fastCache.keys()) {
+    if (key.includes(filterPattern)) {
+      fastCache.delete(key);
+    }
+  }
+};
+
+/**
+ * High-speed cached GET request with Stale-While-Revalidate
+ */
+const cachedGet = async (url, config = {}, ttl = DEFAULT_TTL) => {
+  if (config.bypassCache) {
+    const fresh = await api.get(url, config);
+    fastCache.set(url, { data: fresh, timestamp: Date.now() });
+    return fresh;
+  }
+
+  const cacheKey = `${url}:${JSON.stringify(config.params || {})}`;
+  const cached = fastCache.get(cacheKey);
+  const now = Date.now();
+
+  if (cached) {
+    const age = now - cached.timestamp;
+    if (age < ttl) {
+      // Revalidate in the background if older than 12s
+      if (age > 12000) {
+        api.get(url, config).then((fresh) => {
+          fastCache.set(cacheKey, { data: fresh, timestamp: Date.now() });
+        }).catch(() => {});
+      }
+      return cached.data; // 0ms instant render
+    }
+  }
+
+  const fresh = await api.get(url, config);
+  fastCache.set(cacheKey, { data: fresh, timestamp: Date.now() });
+  return fresh;
+};
+
 export const authApi = {
-  register: (data) => api.post('/auth/register', data),
-  login: (data) => api.post('/auth/login', data),
-  getMe: () => api.get('/auth/me'),
+  register: (data) => {
+    clearApiCache();
+    return api.post('/auth/register', data);
+  },
+  login: (data) => {
+    clearApiCache();
+    return api.post('/auth/login', data);
+  },
+  getMe: () => cachedGet('/auth/me', {}, 60000),
 };
 
 export const auditApi = {
-  createAudit: (data) => api.post('/audits', data),
-  getAudits: () => api.get('/audits'),
-  getAuditById: (id) => api.get(`/audits/${id}`),
-  deleteAudit: (id) => api.delete(`/audits/${id}`),
-  getPages: (id) => api.get(`/audits/${id}/pages`),
-  getIssues: (id, severity) => api.get(`/audits/${id}/issues`, { params: { severity } }),
-  getRoadmap: (id) => api.get(`/audits/${id}/roadmap`),
-  getBacklinkAnalysis: (id) => api.get(`/audits/${id}/backlinks`),
+  createAudit: async (data) => {
+    clearApiCache();
+    return api.post('/audits', data);
+  },
+  getAudits: (config) => cachedGet('/audits', config, 30000),
+  getAuditById: (id, config) => cachedGet(`/audits/${id}`, config, 60000),
+  deleteAudit: async (id) => {
+    clearApiCache();
+    return api.delete(`/audits/${id}`);
+  },
+  getPages: (id, config) => cachedGet(`/audits/${id}/pages`, config, 60000),
+  getIssues: (id, severity, config) => cachedGet(`/audits/${id}/issues`, { ...config, params: { severity, ...(config?.params || {}) } }, 60000),
+  getRoadmap: (id, config) => cachedGet(`/audits/${id}/roadmap`, config, 60000),
+  getBacklinkAnalysis: (id, config) => cachedGet(`/audits/${id}/backlinks`, config, 60000),
   inspectSite: (data) => api.post('/audits/inspect-site', data),
   compareAudits: (data) => api.post('/audits/compare', data),
   analyzeBacklitWords: (data) => api.post('/audits/backlit-words', data),
@@ -69,10 +134,17 @@ export const reportsApi = {
 };
 
 export const antigravityApi = {
-  getSession: (auditId) => api.get(`/audits/${auditId}/antigravity/session`),
-  getBlueprint: (auditId, framework = 'html') => api.get(`/audits/${auditId}/antigravity/blueprint`, { params: { framework } }),
-  repairIssue: (data) => api.post('/audits/antigravity/repair-issue', data),
-  resolveIssue: (auditId, data) => api.post(`/audits/${auditId}/antigravity/resolve-issue`, data),
+  getSession: (auditId, config) => cachedGet(`/audits/${auditId}/antigravity/session`, config, 30000),
+  getBlueprint: (auditId, framework = 'html', config) =>
+    cachedGet(`/audits/${auditId}/antigravity/blueprint`, { ...config, params: { framework, ...(config?.params || {}) } }, 60000),
+  repairIssue: async (data) => {
+    clearApiCache();
+    return api.post('/audits/antigravity/repair-issue', data);
+  },
+  resolveIssue: async (auditId, data) => {
+    clearApiCache();
+    return api.post(`/audits/${auditId}/antigravity/resolve-issue`, data);
+  },
   getPatchDownloadUrl: (auditId, framework = 'html') => {
     const base = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/$/, '') : '';
     return `${base}/api/audits/${auditId}/antigravity/download-patch?framework=${framework}`;
@@ -80,7 +152,7 @@ export const antigravityApi = {
 };
 
 export const healthApi = {
-  check: () => api.get('/health'),
+  check: () => cachedGet('/health', {}, 10000),
 };
 
 export default api;

@@ -526,7 +526,7 @@ export default function IssuesPage() {
               return (
                 <div
                   key={issue.id}
-                  className={`rounded-3xl border transition-all duration-200 overflow-hidden ${
+                  className={`content-auto-card render-contain rounded-3xl border transition-all duration-150 overflow-hidden ${
                     isResolved
                       ? 'border-emerald-200/80 dark:border-emerald-900/60 bg-emerald-50/20 dark:bg-emerald-950/10 opacity-75'
                       : isExpanded

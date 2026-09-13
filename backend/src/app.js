@@ -2,12 +2,38 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const config = require('./config/env');
 const apiRoutes = require('./routes');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 
 const app = express();
+
+// High-performance ETag generation for instant 304 Not Modified caching
+app.set('etag', 'strong');
+
+// High-speed Brotli / Gzip response compression (shrinks JSON payloads up to 85%)
+app.use(compression({
+  threshold: 512, // Compress any response larger than 512 bytes
+  level: 6,       // Optimal trade-off between CPU cycles and compression ratio
+  filter: (req, res) => {
+    if (req.headers['x-no-compression']) {
+      return false;
+    }
+    return compression.filter(req, res);
+  }
+}));
+
+// Browser Caching & Performance Headers Middleware
+app.use((req, res, next) => {
+  res.set('X-Content-Type-Options', 'nosniff');
+  // Enable Stale-While-Revalidate caching semantics for non-auth GET requests
+  if (req.method === 'GET' && !req.path.includes('/auth/')) {
+    res.set('Cache-Control', 'public, max-age=10, stale-while-revalidate=60');
+  }
+  next();
+});
 
 // Security Headers
 app.use(helmet({

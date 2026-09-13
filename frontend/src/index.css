@@ -179,3 +179,60 @@
 .delay-300 { animation-delay: 300ms; }
 .delay-400 { animation-delay: 400ms; }
 .delay-500 { animation-delay: 500ms; }
+
+/* ==========================================================
+   ⚡ HIGH-SPEED BROWSER RENDERING & LIGHTWEIGHT ENGINE
+   ========================================================== */
+
+/* 1. Next-Gen CSS Content-Visibility for Ultra-Fast List & Table Rendering */
+.content-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 120px;
+}
+
+.content-auto-card {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 240px;
+}
+
+/* 2. Strict Layout Containment: isolates DOM subtrees to stop layout recalculations */
+.render-contain {
+  contain: layout style paint;
+}
+
+.render-paint {
+  contain: paint;
+}
+
+/* 3. Hardware Compositing: forces rendering on discrete GPU layer for 60-120fps */
+.fast-gpu {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+  will-change: transform, opacity;
+}
+
+/* 4. Instant Snappy Micro-Transitions without CPU reflows */
+.snap-transition {
+  transition: transform 0.12s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.12s ease;
+}
+
+/* 5. Ultra-Lightweight Mode (User or Low-End Device Activated):
+   Eliminates heavy blur matrices and multi-layer drop shadows for maximum FPS */
+.lightweight-mode .glass-card,
+.lightweight-mode .glass-panel {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08) !important;
+}
+
+.lightweight-mode * {
+  animation-duration: 0.12s !important;
+  transition-duration: 0.08s !important;
+}
+
+/* 6. Scrolling Performance: prevent pointer hover repainting while fast scrolling */
+body.is-scrolling * {
+  pointer-events: none !important;
+}
+

@@ -3,6 +3,7 @@ import { Menu, Plus, Sun, Moon, Globe, ShieldCheck, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../hooks/useTheme';
 import TurboBoostModal from '../common/TurboBoostModal';
+import PerformanceSpeedBadge from '../common/PerformanceSpeedBadge';
 
 export default function Topbar({ setMobileOpen, activeWebsite = null }) {
   const { isDark, toggleTheme } = useTheme();
@@ -40,6 +41,9 @@ export default function Topbar({ setMobileOpen, activeWebsite = null }) {
 
         {/* Action Controls */}
         <div className="flex items-center gap-2 sm:gap-3">
+          {/* Live Performance & Lightweight Engine Monitor */}
+          <PerformanceSpeedBadge />
+
           {/* Turbo Boost & Cache Button */}
           <button
             onClick={() => setTurboOpen(true)}

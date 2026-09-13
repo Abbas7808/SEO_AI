@@ -747,7 +747,7 @@ export default function BacklitWordsPage() {
                       backlinkData.topAnchorWords.map((anchor, idx) => (
                         <div
                           key={idx}
-                          className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 text-xs"
+                          className="content-auto render-contain flex items-center justify-between p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 text-xs"
                         >
                           <span className="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-xs">
                             "{anchor.text}"
@@ -778,7 +778,7 @@ export default function BacklitWordsPage() {
                     {backlinkData.targetAnchorRecommendations?.map((rec, idx) => (
                       <div
                         key={idx}
-                        className="flex items-center justify-between p-3 rounded-xl bg-violet-50/50 dark:bg-violet-950/30 border border-violet-100 dark:border-violet-900/40 text-xs"
+                        className="content-auto render-contain flex items-center justify-between p-3 rounded-xl bg-violet-50/50 dark:bg-violet-950/30 border border-violet-100 dark:border-violet-900/40 text-xs"
                       >
                         <div>
                           <span className="font-bold text-slate-900 dark:text-white block">
