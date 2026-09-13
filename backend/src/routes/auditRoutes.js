@@ -17,6 +17,7 @@ router.post('/scan-local', optionalAuth, auditController.scanLocalProject);
 router.post('/antigravity/open-editor', optionalAuth, auditController.openInAntigravity);
 router.post('/antigravity/open-workspace', optionalAuth, auditController.openWorkspaceInAntigravity);
 router.post('/antigravity/apply-local-fix', optionalAuth, auditController.applyLocalFix);
+router.post('/antigravity/batch-apply-local-fixes', optionalAuth, auditController.batchApplyLocalFixes);
 
 // Google Antigravity Autonomous SEO Auto-Fixer
 router.post('/antigravity/repair-issue', optionalAuth, auditController.repairIssueWithAntigravity);

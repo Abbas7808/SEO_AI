@@ -126,6 +126,10 @@ export const auditApi = {
     clearApiCache();
     return api.post('/audits/antigravity/apply-local-fix', data);
   },
+  batchApplyLocalFixes: async (data) => {
+    clearApiCache();
+    return api.post('/audits/antigravity/batch-apply-local-fixes', data);
+  },
 };
 
 export const aiApi = {
