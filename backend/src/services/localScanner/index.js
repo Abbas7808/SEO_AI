@@ -127,13 +127,44 @@ class LocalScannerService {
       throw new Error(val.message);
     }
 
-    const { targetKeyword = '', businessName = '', businessLocation = '' } = options;
+    const { targetKeyword = '', businessName = '', businessLocation = '', websiteUrl = '' } = options;
     const rootDir = val.resolvedPath;
     const fileList = [];
     LocalScannerService._collectFiles(rootDir, rootDir, fileList, 120);
 
     if (fileList.length === 0) {
       throw new Error('No web source files (.html, .jsx, .tsx, .vue, .astro, .php) found in this folder.');
+    }
+
+    // Optional Live Server Inspection if developer website is currently running
+    let liveWebsiteData = null;
+    if (websiteUrl && typeof websiteUrl === 'string' && websiteUrl.trim()) {
+      try {
+        const liveTarget = websiteUrl.trim();
+        const startTime = Date.now();
+        const axios = require('axios');
+        const liveRes = await axios.get(liveTarget, {
+          timeout: 7000,
+          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; GoogleAntigravitySEOAuditor/2.0)' },
+          validateStatus: () => true
+        });
+        const duration = Date.now() - startTime;
+        liveWebsiteData = {
+          url: liveTarget,
+          statusCode: liveRes.status,
+          responseTimeMs: duration,
+          headers: {
+            contentType: liveRes.headers['content-type'] || 'text/html',
+            server: liveRes.headers['server'] || 'Node/Vite DevServer',
+            hsts: !!liveRes.headers['strict-transport-security'],
+            csp: !!liveRes.headers['content-security-policy']
+          },
+          htmlSnippet: typeof liveRes.data === 'string' ? liveRes.data.slice(0, 500) : ''
+        };
+        logger.info(`Live website reached at ${liveTarget}: Status ${liveRes.status} in ${duration}ms`);
+      } catch (err) {
+        logger.warn(`Live website check notice for ${websiteUrl}: ${err.message}`);
+      }
     }
 
     logger.info(`Starting local codebase SEO scan of ${val.projectName} (${fileList.length} files)...`);
@@ -201,6 +232,7 @@ class LocalScannerService {
       structuredDataScore,
       socialScore,
       localScore,
+      liveWebsiteData,
       issues: allIssues,
       summary: {
         critical: criticals.length,

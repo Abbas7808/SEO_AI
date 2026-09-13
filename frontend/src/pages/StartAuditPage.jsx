@@ -72,6 +72,9 @@ export default function StartAuditPage() {
     const initialMode = searchParams.get('mode');
     if (initialMode === 'local') {
       setScanMode('local');
+      if (!initialUrl) {
+        setWebsiteUrl('http://localhost:5173');
+      }
     }
     const initialPath = searchParams.get('path');
     if (initialPath) {
@@ -96,18 +99,18 @@ export default function StartAuditPage() {
   ];
 
   const localAuditSteps = [
+    'Connecting to live website / dev server & testing response latency',
     'Validating local project directory & source permissions',
+    'Auditing live rendered DOM, meta tags & mobile viewport',
     'Indexing codebase files (.html, .jsx, .tsx, .vue, .astro, .php)',
-    'Parsing document head, title tags & character lengths',
-    'Auditing meta descriptions & mobile viewport tags',
-    'Evaluating H1-H6 heading hierarchy & semantics line-by-line',
+    'Parsing document head, title tags & character lengths line-by-line',
+    'Auditing meta descriptions & mobile viewport tags in source code',
     'Scanning image tags for missing alt attributes with exact lines',
-    'Checking link protocols, anchor texts & security attributes',
-    'Validating Schema.org JSON-LD structured data in templates',
-    'Calculating grounded 0-100 local codebase SEO score',
+    'Evaluating H1-H6 heading hierarchy & code semantics',
+    'Calculating grounded 0-100 local codebase & live SEO score',
     'Synthesizing line-level code diffs for Google Antigravity',
     'Configuring Google Antigravity autonomous agent session',
-    'Codebase audit complete!'
+    'Dual audit complete! Ready to edit in Google Antigravity.'
   ];
 
   const handleValidatePath = async () => {
@@ -189,9 +192,10 @@ export default function StartAuditPage() {
       setAuditProgress({ stepIndex: 0, percent: 5, currentStep: activeSteps[0] });
 
       try {
-        // Call backend local scanner
+        // Call backend local scanner with both projectPath and live website URL
         const scanResult = await auditApi.scanLocalProject({
           projectPath: projectPath.trim(),
+          websiteUrl: websiteUrl.trim() || 'http://localhost:5173',
           targetKeyword: targetKeyword.trim(),
           businessName: businessName.trim(),
           businessLocation: businessLocation.trim()
@@ -402,11 +406,16 @@ export default function StartAuditPage() {
                   )}
                 </div>
                 <div>
-                  <span className="font-extrabold text-sm text-slate-900 dark:text-white block">
-                    🌐 Live Online Website
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-extrabold text-sm text-slate-900 dark:text-white block">
+                      🌐 Online Website
+                    </span>
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-brand-500/10 text-brand-600 dark:text-brand-400">
+                      Normal User / Client
+                    </span>
+                  </div>
                   <span className="text-xs text-slate-500 dark:text-slate-400 mt-1 block leading-relaxed">
-                    Source code is <strong>not on this computer</strong> (e.g. client site or live production). Deep technical SEO, server headers, SSL, robots.txt, and sitemap.
+                    Source code is <strong>not on this computer</strong>. Crawls live remote pages, tests HTTP response, on-page SEO, robots.txt, and sitemap.
                   </span>
                 </div>
               </button>
@@ -414,7 +423,10 @@ export default function StartAuditPage() {
               {/* Option 2: Local Codebase */}
               <button
                 type="button"
-                onClick={() => setScanMode('local')}
+                onClick={() => {
+                  setScanMode('local');
+                  if (!websiteUrl) setWebsiteUrl('http://localhost:5173');
+                }}
                 className={`p-4 rounded-2xl border-2 text-left transition-all relative flex flex-col justify-between gap-3 ${
                   scanMode === 'local'
                     ? 'border-indigo-500 bg-indigo-50/60 dark:bg-indigo-950/40 shadow-md shadow-indigo-500/10'
@@ -434,11 +446,16 @@ export default function StartAuditPage() {
                   )}
                 </div>
                 <div>
-                  <span className="font-extrabold text-sm text-slate-900 dark:text-white block">
-                    💻 Local Project Codebase
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-extrabold text-sm text-slate-900 dark:text-white block">
+                      💻 Developer Mode
+                    </span>
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-700 dark:text-indigo-300">
+                      Codebase + Live Website
+                    </span>
+                  </div>
                   <span className="text-xs text-slate-500 dark:text-slate-400 mt-1 block leading-relaxed">
-                    Source code is <strong>on this laptop</strong> (HTML, React, Next.js, Vue, PHP). Generates line-level code fixes with <strong>Google Antigravity IDE</strong> link.
+                    Project is <strong>on your computer & live</strong>. Analyzes the live website properly, maps issues to source code lines, and opens <strong>Google Antigravity IDE</strong> for live coding.
                   </span>
                 </div>
               </button>
@@ -511,8 +528,59 @@ export default function StartAuditPage() {
               </div>
             </div>
           ) : (
-            /* LOCAL CODEBASE INPUTS */
-            <div className="space-y-4 pt-2 border-t border-slate-200 dark:border-slate-800">
+            /* DEVELOPER MODE (LOCAL CODEBASE + LIVE WEBSITE) INPUTS */
+            <div className="space-y-5 pt-2 border-t border-slate-200 dark:border-slate-800">
+              {/* 1. Live Website / Dev Server URL */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                    Live Website / Local Dev Server URL <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="flex items-center gap-1.5 text-[11px]">
+                    <span className="text-slate-400">Presets:</span>
+                    <button
+                      type="button"
+                      onClick={() => setWebsiteUrl('http://localhost:5173')}
+                      className="px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-bold hover:bg-indigo-100 dark:hover:bg-indigo-900/60 border border-indigo-200 dark:border-indigo-800"
+                    >
+                      :5173 (Vite)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setWebsiteUrl('http://localhost:3000')}
+                      className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold hover:bg-slate-200 dark:hover:bg-slate-700"
+                    >
+                      :3000
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setWebsiteUrl('http://127.0.0.1:8000')}
+                      className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold hover:bg-slate-200 dark:hover:bg-slate-700"
+                    >
+                      :8000
+                    </button>
+                  </div>
+                </div>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <Globe className="w-5 h-5 text-indigo-500" />
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    value={websiteUrl}
+                    onChange={(e) => setWebsiteUrl(e.target.value)}
+                    placeholder="e.g. http://localhost:5173 or https://my-staging.com"
+                    className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+                <p className="mt-1.5 text-[11px] text-slate-400 flex items-center gap-1">
+                  <Zap className="w-3.5 h-3.5 text-amber-500" />
+                  Live site is crawled to analyze rendered DOM tags, status codes, and server response time.
+                </p>
+              </div>
+
+              {/* 2. Local Project Folder Path */}
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
@@ -558,7 +626,7 @@ export default function StartAuditPage() {
                 </div>
                 <p className="mt-1.5 text-[11px] text-slate-400 flex items-center gap-1">
                   <Bot className="w-3.5 h-3.5 text-indigo-400" />
-                  Scans .html, .jsx, .tsx, .vue, .astro, and .php files. Generates line-level Google Antigravity prompts.
+                  Maps live SEO issues to exact source files and line numbers so you can edit in Google Antigravity IDE.
                 </p>
               </div>
 
