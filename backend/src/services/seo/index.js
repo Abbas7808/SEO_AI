@@ -3,6 +3,7 @@ const SeoScorer = require('./scorer');
 const SeoRoadmapGenerator = require('./roadmapGenerator');
 const BacklinkAnalyzer = require('./backlinkAnalyzer');
 const SiteInspector = require('./siteInspector');
+const TrafficEstimator = require('./trafficEstimator');
 
 /**
  * High-level SEO Engine coordinating analysis and scoring
@@ -37,11 +38,19 @@ class SeoEngine {
       context
     });
 
+    // 5. Generate Estimated Website Traffic Profile
+    const trafficProfile = TrafficEstimator.estimate({
+      analyzedPages,
+      scoreResult,
+      context
+    });
+
     return {
       analyzedPages,
       scoreResult,
       roadmap,
-      backlinkProfile
+      backlinkProfile,
+      trafficProfile
     };
   }
 }
@@ -52,5 +61,6 @@ module.exports = {
   SeoScorer,
   SeoRoadmapGenerator,
   BacklinkAnalyzer,
-  SiteInspector
+  SiteInspector,
+  TrafficEstimator
 };

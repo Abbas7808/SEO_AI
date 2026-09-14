@@ -8,7 +8,7 @@ const pageModel = require('../models/pageModel');
 const issueModel = require('../models/issueModel');
 const { validateAuditUrl } = require('../utils/ssrfGuard');
 const CrawlerService = require('../services/crawler');
-const { SeoEngine, SeoRoadmapGenerator, BacklinkAnalyzer, SiteInspector } = require('../services/seo');
+const { SeoEngine, SeoRoadmapGenerator, BacklinkAnalyzer, SiteInspector, TrafficEstimator } = require('../services/seo');
 const aiService = require('../services/ai');
 const antigravityEngine = require('../services/ai/antigravityEngine');
 const logger = require('../utils/logger');
@@ -71,7 +71,7 @@ const auditController = {
         businessLocation: businessLocation ? businessLocation.trim() : ''
       };
 
-      const { analyzedPages, scoreResult, roadmap, backlinkProfile } = SeoEngine.analyzeAndScore(crawlResult.pages, context);
+      const { analyzedPages, scoreResult, roadmap, backlinkProfile, trafficProfile } = SeoEngine.analyzeAndScore(crawlResult.pages, context);
 
       // 8. Persist crawled pages to database
       const pageIdMap = new Map();
@@ -161,11 +161,12 @@ const auditController = {
         });
         aiSummary.roadmap = roadmap;
         aiSummary.backlinkProfile = backlinkProfile;
+        aiSummary.trafficProfile = trafficProfile;
         aiSummary.antigravityBlueprint = antigravityBlueprint;
         aiSummaryJson = JSON.stringify(aiSummary);
       } catch (aiErr) {
         logger.warn(`AI Summary generation note: ${aiErr.message}`);
-        aiSummaryJson = JSON.stringify({ roadmap, backlinkProfile, antigravityBlueprint });
+        aiSummaryJson = JSON.stringify({ roadmap, backlinkProfile, trafficProfile, antigravityBlueprint });
       }
 
       // 12. Update audit with calculated real scores and completed status
@@ -198,6 +199,7 @@ const auditController = {
           scoreResult,
           roadmap,
           backlinkProfile,
+          trafficProfile,
           antigravityBlueprint
         }
       });
@@ -281,6 +283,17 @@ const auditController = {
       if (!backlinkProfile) {
         backlinkProfile = BacklinkAnalyzer.analyze({ analyzedPages: pages, context });
       }
+      let trafficProfile = null;
+      if (audit.ai_summary) {
+        try {
+          const parsed = JSON.parse(audit.ai_summary);
+          trafficProfile = parsed.trafficProfile || null;
+        } catch (e) {}
+      }
+      if (!trafficProfile) {
+        trafficProfile = TrafficEstimator.estimate({ analyzedPages: pages, scoreResult, context });
+      }
+
       if (!antigravityBlueprint) {
         antigravityBlueprint = antigravityEngine.batchRepairAll({
           auditId: id,
@@ -445,6 +458,7 @@ const auditController = {
           issueCounts,
           roadmap,
           backlinkProfile,
+          trafficProfile,
           antigravityBlueprint
         }
       });
@@ -1325,7 +1339,7 @@ const auditController = {
         businessName: businessName ? String(businessName).trim() : '',
         businessLocation: businessLocation ? String(businessLocation).trim() : ''
       };
-      const { analyzedPages, scoreResult, roadmap, backlinkProfile } = SeoEngine.analyzeAndScore(crawlResult.pages, context);
+      const { analyzedPages, scoreResult, roadmap, backlinkProfile, trafficProfile } = SeoEngine.analyzeAndScore(crawlResult.pages, context);
 
       send('progress', { stage: 'scored', percent: 65, score: scoreResult.overallScore, message: `📊 SEO Score calculated: ${scoreResult.overallScore}/100` });
 
@@ -1391,11 +1405,12 @@ const auditController = {
         });
         aiSummary.roadmap = roadmap;
         aiSummary.backlinkProfile = backlinkProfile;
+        aiSummary.trafficProfile = trafficProfile;
         aiSummary.antigravityBlueprint = antigravityBlueprint;
         aiSummaryJson = JSON.stringify(aiSummary);
       } catch (aiErr) {
         logger.warn(`AI summary note: ${aiErr.message}`);
-        aiSummaryJson = JSON.stringify({ roadmap, backlinkProfile, antigravityBlueprint });
+        aiSummaryJson = JSON.stringify({ roadmap, backlinkProfile, trafficProfile, antigravityBlueprint });
       }
 
       // 9. Finalize in DB
@@ -1416,7 +1431,7 @@ const auditController = {
         stage: 'complete',
         percent: 100,
         message: `🎉 Audit complete! SEO Score: ${scoreResult.overallScore}/100`,
-        data: { audit: completedAudit, scoreResult, roadmap, backlinkProfile, antigravityBlueprint }
+        data: { audit: completedAudit, scoreResult, roadmap, backlinkProfile, trafficProfile, antigravityBlueprint }
       });
 
       logger.info(`[StreamAudit] Audit #${auditId} completed. Score: ${scoreResult.overallScore}/100`);
@@ -1425,6 +1440,40 @@ const auditController = {
       send('error', { message: error.message || 'Audit failed. Please try again.' });
     } finally {
       done();
+    }
+  },
+
+  /**
+   * Standalone instant website traffic estimation
+   */
+  async estimateTrafficForUrl(req, res, next) {
+    try {
+      const { url, websiteUrl, targetKeyword, businessName, businessLocation } = req.body;
+      const targetUrl = websiteUrl || url;
+      if (!targetUrl) {
+        return res.status(400).json({ success: false, message: 'Website URL is required.' });
+      }
+
+      const trafficProfile = TrafficEstimator.estimate({
+        analyzedPages: [],
+        scoreResult: { overallScore: 78, mobileScore: 82 },
+        context: {
+          websiteUrl: targetUrl,
+          targetKeyword: targetKeyword ? String(targetKeyword).trim() : '',
+          businessName: businessName ? String(businessName).trim() : '',
+          businessLocation: businessLocation ? String(businessLocation).trim() : ''
+        }
+      });
+
+      res.json({
+        success: true,
+        message: 'Traffic estimated successfully.',
+        data: {
+          trafficProfile
+        }
+      });
+    } catch (error) {
+      next(error);
     }
   }
 };

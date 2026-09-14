@@ -42,6 +42,7 @@ import CodeDiffViewer from '../components/common/CodeDiffViewer';
 import DetectedTechStackCard from '../components/common/DetectedTechStackCard';
 import TechnicalSeoPanel from '../components/common/TechnicalSeoPanel';
 import GoogleAntigravityModal from '../components/common/GoogleAntigravityModal';
+import TrafficAnalyticsCard from '../components/common/TrafficAnalyticsCard';
 import { exportIssuesToCsv, exportAuditToJson, exportAuditToMarkdown } from '../utils/exportUtils';
 
 export default function IssuesPage() {
@@ -90,6 +91,7 @@ export default function IssuesPage() {
   const [currentAudit, setCurrentAudit] = useState(null);
   const [auditPages, setAuditPages] = useState([]);
   const [siteIntelligence, setSiteIntelligence] = useState(null);
+  const [trafficProfile, setTrafficProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeSeverityFilter, setActiveSeverityFilter] = useState('all');
   const [activeCategoryFilter, setActiveCategoryFilter] = useState('all');
@@ -236,6 +238,10 @@ export default function IssuesPage() {
           if (cachedIntel) {
             setSiteIntelligence(JSON.parse(cachedIntel));
           }
+          const cachedTraffic = localStorage.getItem('seo_traffic_' + targetId);
+          if (cachedTraffic) {
+            setTrafficProfile(JSON.parse(cachedTraffic));
+          }
           const cachedIssues = localStorage.getItem('seo_issues_' + targetId);
           if (cachedIssues) {
             const parsedIssues = JSON.parse(cachedIssues);
@@ -262,6 +268,9 @@ export default function IssuesPage() {
             }
             if (auditRes?.data?.siteIntelligence) {
               setSiteIntelligence(auditRes.data.siteIntelligence);
+            }
+            if (auditRes?.data?.trafficProfile) {
+              setTrafficProfile(auditRes.data.trafficProfile);
             }
           }
           if (issuesRes?.data?.issues && issuesRes.data.issues.length > 0) {
@@ -488,6 +497,11 @@ export default function IssuesPage() {
           />
         );
       })()}
+
+      {/* Website Traffic & Audience Estimation Card */}
+      {trafficProfile && (
+        <TrafficAnalyticsCard trafficProfile={trafficProfile} />
+      )}
 
       {/* 3. WEBSITE ISSUES & RESOLUTION CENTER */}
       <div className="space-y-6">

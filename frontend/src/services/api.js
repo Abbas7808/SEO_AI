@@ -114,6 +114,7 @@ export const auditApi = {
   inspectSite: (data) => api.post('/audits/inspect-site', data),
   compareAudits: (data) => api.post('/audits/compare', data),
   analyzeBacklitWords: (data) => api.post('/audits/backlit-words', data),
+  estimateTraffic: (data) => api.post('/audits/estimate-traffic', data),
   validateLocalPath: (data) => api.post('/audits/validate-local-path', data),
   scanLocalProject: async (data) => {
     clearApiCache();

@@ -13,6 +13,7 @@ router.get('/stream', optionalAuth, auditController.streamAudit);
 router.post('/inspect-site', optionalAuth, auditController.inspectSite);
 router.post('/compare', optionalAuth, auditController.compareAudits);
 router.post('/backlit-words', optionalAuth, auditController.analyzeBacklitWords);
+router.post('/estimate-traffic', optionalAuth, auditController.estimateTrafficForUrl);
 
 // Local Codebase Scanning & Direct File Patching
 router.post('/validate-local-path', optionalAuth, auditController.validateLocalPath);
