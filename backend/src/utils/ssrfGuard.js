@@ -53,6 +53,12 @@ async function validateAuditUrl(inputUrl) {
   }
 
   let formattedUrl = inputUrl.trim();
+  // Strip markdown link syntax: [text](https://example.com) or (https://example.com)
+  const mdMatch = formattedUrl.match(/\((https?:\/\/[^\s)]+)\)/i) || formattedUrl.match(/\[(https?:\/\/[^\]]+)\]/i);
+  if (mdMatch) formattedUrl = mdMatch[1];
+  // Strip surrounding quotes, angle brackets, backticks, and whitespace
+  formattedUrl = formattedUrl.replace(/^[<"'\s`]+|[>"'\s`]+$/g, '').trim();
+
   if (!/^https?:\/\//i.test(formattedUrl)) {
     formattedUrl = `https://${formattedUrl}`;
   }
@@ -61,7 +67,7 @@ async function validateAuditUrl(inputUrl) {
   try {
     parsed = new URL(formattedUrl);
   } catch (err) {
-    throw validationError('Invalid URL format.');
+    throw validationError('Invalid URL format. Please provide a valid domain or URL.');
   }
 
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
@@ -69,8 +75,14 @@ async function validateAuditUrl(inputUrl) {
   }
 
   const hostname = parsed.hostname.toLowerCase();
+  const isDev = process.env.NODE_ENV !== 'production';
 
-  // Block localhost, local, internal domain suffixes
+  // Allow localhost & 127.0.0.1 in development mode for dev server presets (:5173, :3000, :8000)
+  if (isDev && (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1')) {
+    return parsed.href;
+  }
+
+  // Block localhost, local, internal domain suffixes in production
   const blockedHostnames = ['localhost', '127.0.0.1', '::1', '0.0.0.0', 'router.local'];
   if (blockedHostnames.includes(hostname) || hostname.endsWith('.local') || hostname.endsWith('.internal')) {
     throw validationError('Local and internal addresses are not allowed.');
@@ -86,13 +98,13 @@ async function validateAuditUrl(inputUrl) {
     try {
       const addresses = await dns.lookup(hostname, { all: true });
       for (const addr of addresses) {
-        if (isPrivateIp(addr.address)) {
+        if (!isDev && isPrivateIp(addr.address)) {
           throw validationError(`The domain resolves to a private IP address (${addr.address}), which is not permitted.`);
         }
       }
     } catch (dnsErr) {
       if (dnsErr.code === 'ENOTFOUND') {
-        throw validationError('Domain name could not be resolved. Please check the URL.');
+        throw validationError('Domain name could not be resolved. Please verify the website URL.');
       }
       throw dnsErr;
     }

@@ -51,12 +51,22 @@ export function extractBrandFromUrl(url) {
  * Fetches live HTML using direct fetch with fast fallback to reliable public CORS proxies
  */
 export async function fetchLiveHtml(url, minLength = 15) {
-  const targetUrl = url.startsWith('http') ? url : `https://${url}`;
+  let targetUrl = url.trim();
+  // Strip markdown link syntax & quotes
+  const mdMatch = targetUrl.match(/\((https?:\/\/[^\s)]+)\)/i) || targetUrl.match(/\[(https?:\/\/[^\]]+)\]/i);
+  if (mdMatch) targetUrl = mdMatch[1];
+  targetUrl = targetUrl.replace(/^[<"'\s`]+|[>"'\s`]+$/g, '').trim();
 
-  // 1. Try direct fetch (works if CORS allowed or same domain)
+  if (!/^https?:\/\//i.test(targetUrl)) {
+    targetUrl = `https://${targetUrl}`;
+  }
+
+  const isLocal = targetUrl.includes('localhost') || targetUrl.includes('127.0.0.1');
+
+  // 1. Try direct fetch
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    const timeoutId = setTimeout(() => controller.abort(), isLocal ? 2000 : 3500);
     const res = await fetch(targetUrl, { signal: controller.signal });
     clearTimeout(timeoutId);
     if (res.ok) {
@@ -64,10 +74,15 @@ export async function fetchLiveHtml(url, minLength = 15) {
       if (text && text.length >= minLength) return text;
     }
   } catch (e) {
-    // Expected to fail on cross-origin without CORS headers
+    // Expected on cross-origin without CORS
   }
 
-  // 2. Cascade through high-speed public CORS gateways
+  if (isLocal) {
+    // Do not attempt external proxies for local developer addresses
+    return null;
+  }
+
+  // 2. Cascade through high-speed public CORS gateways with fast 3.5s timeouts
   const proxies = [
     (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
     (u) => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
@@ -78,7 +93,7 @@ export async function fetchLiveHtml(url, minLength = 15) {
     try {
       const proxyUrl = proxyGen(targetUrl);
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
       const res = await fetch(proxyUrl, { signal: controller.signal });
       clearTimeout(timeoutId);
       if (res.ok) {
@@ -580,10 +595,23 @@ export function parseWebsiteData(html, websiteUrl, options = {}) {
 /**
  * Main function to scan a website in real-time
  */
-export async function scanLiveWebsite(websiteUrl, options = {}) {
+export async function scanLiveWebsite(websiteUrl, options = {}, onProgress = null) {
+  let opts = options;
+  let progressCb = onProgress;
+  if (typeof options === 'string') {
+    opts = { targetKeyword: options };
+  } else if (typeof options === 'function') {
+    progressCb = options;
+    opts = {};
+  }
+
   const cleanUrl = websiteUrl.trim();
+  if (progressCb) progressCb({ percent: 70, message: '🔗 Connecting to host & fetching DOM...' });
+
   const html = await fetchLiveHtml(cleanUrl);
-  const parsed = parseWebsiteData(html, cleanUrl, options);
+
+  if (progressCb) progressCb({ percent: 85, message: '🧠 Parsing tags, meta & calculating score...' });
+  const parsed = parseWebsiteData(html, cleanUrl, opts);
 
   // Store into localStorage for persistent real-time access
   try {
@@ -603,6 +631,7 @@ export async function scanLiveWebsite(websiteUrl, options = {}) {
     console.warn('LocalStorage save error:', e);
   }
 
+  if (progressCb) progressCb({ percent: 100, message: '🎉 Direct DOM scan complete!' });
   return parsed;
 }
 

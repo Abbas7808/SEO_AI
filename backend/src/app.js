@@ -18,7 +18,7 @@ app.use(compression({
   threshold: 512, // Compress any response larger than 512 bytes
   level: 6,       // Optimal trade-off between CPU cycles and compression ratio
   filter: (req, res) => {
-    if (req.headers['x-no-compression']) {
+    if (req.headers['x-no-compression'] || req.headers.accept === 'text/event-stream' || req.path.includes('/stream')) {
       return false;
     }
     return compression.filter(req, res);

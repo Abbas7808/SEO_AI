@@ -150,33 +150,60 @@ export const auditApi = {
     const token = localStorage.getItem('seo_token');
     const finalUrl = token ? `${sseUrl}&token=${encodeURIComponent(token)}` : sseUrl;
 
+    let hasReceivedEvent = false;
+    let isTerminated = false;
+
+    const terminate = (err) => {
+      if (isTerminated) return;
+      isTerminated = true;
+      if (connectTimer) clearTimeout(connectTimer);
+      try { es.close(); } catch {}
+      onError && onError(err || { message: 'Stream connection error' });
+    };
+
     const es = new EventSource(finalUrl);
+
+    // Timeout: if no event received within 15 seconds, gracefully trigger error fallback
+    const connectTimer = setTimeout(() => {
+      if (!hasReceivedEvent) {
+        terminate({ message: 'SSE connection timed out, switching to direct scan...' });
+      }
+    }, 15000);
+
     es.addEventListener('progress', (e) => {
+      hasReceivedEvent = true;
+      if (connectTimer) clearTimeout(connectTimer);
       try { onProgress && onProgress(JSON.parse(e.data)); } catch { }
     });
+
     es.addEventListener('complete', (e) => {
+      hasReceivedEvent = true;
+      if (connectTimer) clearTimeout(connectTimer);
       try {
         const data = JSON.parse(e.data);
         onComplete && onComplete(data);
         clearApiCache(); // invalidate cache so fresh result shows
       } catch { }
-      es.close();
+      try { es.close(); } catch {}
     });
+
     es.addEventListener('error', (e) => {
+      let errPayload = { message: 'Stream connection error' };
       try {
-        const data = e.data ? JSON.parse(e.data) : { message: 'Connection error' };
-        onError && onError(data);
-      } catch {
-        onError && onError({ message: 'Stream connection error' });
-      }
-      es.close();
+        if (e.data) {
+          errPayload = JSON.parse(e.data);
+        }
+      } catch {}
+      terminate(errPayload);
     });
+
     es.onerror = (e) => {
-      // Only fire if readyState is CLOSED (not normal reconnect attempt)
-      if (es.readyState === EventSource.CLOSED) {
-        onError && onError({ message: 'Stream connection lost' });
+      // If error occurs before any event received, or after stream breaks, terminate immediately
+      if (!hasReceivedEvent || es.readyState !== EventSource.OPEN) {
+        terminate({ message: 'SSE connection dropped or unreachable' });
       }
     };
+
     return es;
   },
 };

@@ -20,7 +20,9 @@ import {
   FileCheck,
   Layers,
   Code2,
-  X
+  X,
+  Clipboard,
+  Check
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { auditApi } from '../services/api';
@@ -130,27 +132,71 @@ export default function StartAuditPage() {
     setError('Scan cancelled.');
   };
 
+  const cleanInputUrl = (input) => {
+    if (!input) return '';
+    let val = String(input).trim();
+    // Handle markdown links: [Title](https://example.com) or (https://example.com)
+    const mdMatch = val.match(/\((https?:\/\/[^\s)]+)\)/i) || val.match(/\[(https?:\/\/[^\]]+)\]/i);
+    if (mdMatch) val = mdMatch[1];
+    // Strip surrounding angle brackets, quotes, backticks, spaces
+    val = val.replace(/^[<"'\s`]+|[>"'\s`]+$/g, '').trim();
+    // Auto prefix https:// if not present and not a local address
+    if (val && !/^https?:\/\//i.test(val)) {
+      if (/^(localhost|127\.0\.0\.1|0\.0\.0\.0)/i.test(val)) {
+        val = `http://${val}`;
+      } else {
+        val = `https://${val}`;
+      }
+    }
+    return val;
+  };
+
+  const handleUrlPaste = (e) => {
+    const text = e.clipboardData?.getData('text') || '';
+    if (text) {
+      e.preventDefault();
+      const cleaned = cleanInputUrl(text);
+      setWebsiteUrl(cleaned);
+      setError('');
+    }
+  };
+
+  const handlePasteFromClipboard = async () => {
+    try {
+      if (navigator.clipboard && navigator.clipboard.readText) {
+        const text = await navigator.clipboard.readText();
+        if (text) {
+          const cleaned = cleanInputUrl(text);
+          setWebsiteUrl(cleaned);
+          setError('');
+        }
+      }
+    } catch (err) {
+      console.warn('Clipboard read error:', err);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    let cleanUrl = (websiteUrl || '').trim();
-    if (!cleanUrl) {
-      setError('Please provide a website URL to scan.');
+    const hasLocal = Boolean(projectPath && projectPath.trim());
+    let cleanUrl = cleanInputUrl(websiteUrl);
+
+    if (!cleanUrl && !hasLocal) {
+      setError('Please provide a website URL or select a local project folder to scan.');
       return;
     }
 
-    // Auto-prefix https:// if user entered domain without protocol
-    if (!/^https?:\/\//i.test(cleanUrl)) {
-      cleanUrl = `https://${cleanUrl}`;
+    // If only local path provided, set default dev URL
+    if (!cleanUrl && hasLocal) {
+      cleanUrl = 'http://localhost:5173';
+      setWebsiteUrl(cleanUrl);
+    } else {
       setWebsiteUrl(cleanUrl);
     }
 
     setError('');
     setLoading(true);
-    setAuditProgress({ percent: 5, stage: 'connecting', message: '🔗 Connecting to website & server...' });
-
-    // Close any existing SSE stream
-    if (sseRef.current) sseRef.current.close();
 
     const saveAndRedirect = (auditId, auditData, scoreResult) => {
       try {
@@ -158,6 +204,10 @@ export default function StartAuditPage() {
           localStorage.setItem('seo_latest_audit_id', auditId);
           if (auditData) {
             localStorage.setItem(`seo_current_audit_${auditId}`, JSON.stringify(auditData));
+            const existingList = JSON.parse(localStorage.getItem('seo_audits_list') || '[]');
+            const filtered = existingList.filter(a => a.id !== auditId && a.website_url !== auditData.website_url);
+            filtered.unshift(auditData);
+            localStorage.setItem('seo_audits_list', JSON.stringify(filtered));
           }
           if (scoreResult?.issues) {
             localStorage.setItem(`seo_issues_${auditId}`, JSON.stringify(scoreResult.issues));
@@ -169,6 +219,33 @@ export default function StartAuditPage() {
         navigate(auditId ? `/dashboard/issues?auditId=${auditId}` : '/dashboard/issues');
       }, 500);
     };
+
+    // If local codebase path is specified, run local AST & file inspection
+    if (hasLocal) {
+      setAuditProgress({ percent: 20, stage: 'crawling', message: '📁 Indexing local codebase files and AST tags...' });
+      try {
+        const localRes = await auditApi.scanLocalProject({
+          projectPath: projectPath.trim(),
+          websiteUrl: cleanUrl,
+          targetKeyword: targetKeyword.trim() || undefined,
+          businessName: businessName.trim() || undefined,
+          businessLocation: businessLocation.trim() || undefined
+        });
+
+        if (localRes?.data?.audit?.id) {
+          setAuditProgress({ percent: 85, stage: 'scored', message: '⚡ Synthesizing Antigravity code patches...' });
+          saveAndRedirect(localRes.data.audit.id, localRes.data.audit, localRes.data.scoreResult);
+          return;
+        }
+      } catch (localErr) {
+        console.warn('Local scan fallback to live website crawl:', localErr.message);
+      }
+    }
+
+    setAuditProgress({ percent: 5, stage: 'connecting', message: '🔗 Connecting to website & server...' });
+
+    // Close any existing SSE stream
+    if (sseRef.current) sseRef.current.close();
 
     // Tier 1: Try Real-Time SSE Stream
     try {
@@ -223,6 +300,10 @@ export default function StartAuditPage() {
         try {
           localStorage.setItem('seo_latest_audit_id', auditId);
           localStorage.setItem(`seo_current_audit_${auditId}`, JSON.stringify(res.data.audit));
+          const existingList = JSON.parse(localStorage.getItem('seo_audits_list') || '[]');
+          const filtered = existingList.filter(a => a.id !== auditId && a.website_url !== res.data.audit.website_url);
+          filtered.unshift(res.data.audit);
+          localStorage.setItem('seo_audits_list', JSON.stringify(filtered));
           if (res.data.scoreResult?.issues) {
             localStorage.setItem(`seo_issues_${auditId}`, JSON.stringify(res.data.scoreResult.issues));
           }
@@ -238,8 +319,12 @@ export default function StartAuditPage() {
     // Tier 3: In-Browser Direct Live DOM Scanner
     try {
       setAuditProgress({ percent: 65, stage: 'scanning_dom', message: '🔍 Running live DOM & tech stack audit...' });
-      const liveResult = await scanLiveWebsite(cleanUrl, targetKeyword, (p) => {
-        setAuditProgress({ percent: 75, stage: 'scoring', message: p?.message || 'Inspecting SEO tags...' });
+      const liveResult = await scanLiveWebsite(cleanUrl, {
+        targetKeyword: targetKeyword.trim() || undefined,
+        businessName: businessName.trim() || undefined,
+        businessLocation: businessLocation.trim() || undefined,
+      }, (p) => {
+        setAuditProgress({ percent: p?.percent || 75, stage: 'scoring', message: p?.message || 'Inspecting SEO tags...' });
       });
 
       if (liveResult && liveResult.audit) {
@@ -511,6 +596,15 @@ export default function StartAuditPage() {
                 >
                   :8000
                 </button>
+                <button
+                  type="button"
+                  onClick={handlePasteFromClipboard}
+                  className="px-2 py-0.5 rounded bg-brand-50 dark:bg-brand-950/60 text-brand-600 dark:text-brand-400 font-bold hover:bg-brand-100 dark:hover:bg-brand-900/60 border border-brand-200 dark:border-brand-800 flex items-center gap-1 transition-all"
+                  title="Paste link from clipboard"
+                >
+                  <Clipboard className="w-3 h-3" />
+                  <span>Paste Link</span>
+                </button>
               </div>
             </div>
             <div className="relative">
@@ -519,17 +613,63 @@ export default function StartAuditPage() {
               </div>
               <input
                 type="text"
-                required
+                required={!projectPath.trim()}
                 value={websiteUrl}
-                onChange={(e) => setWebsiteUrl(e.target.value)}
+                onPaste={handleUrlPaste}
+                onChange={(e) => {
+                  setWebsiteUrl(e.target.value);
+                  if (error) setError('');
+                }}
                 placeholder="e.g. https://mywebsite.com or http://localhost:5173"
-                className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-base font-mono focus:outline-none focus:ring-2 focus:ring-brand-500"
+                className="w-full pl-11 pr-24 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-base font-mono focus:outline-none focus:ring-2 focus:ring-brand-500"
               />
+              <div className="absolute inset-y-0 right-0 pr-2 flex items-center gap-1">
+                {websiteUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setWebsiteUrl('')}
+                    title="Clear link"
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-all"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={handlePasteFromClipboard}
+                  className="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-brand-50 dark:hover:bg-brand-950/60 text-slate-600 dark:text-slate-300 hover:text-brand-600 dark:hover:text-brand-400 font-semibold text-xs flex items-center gap-1 transition-all"
+                  title="Paste URL from clipboard"
+                >
+                  <Clipboard className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Paste</span>
+                </button>
+              </div>
             </div>
-            <p className="text-[11px] text-slate-400 flex items-center gap-1.5">
-              <Zap className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-              The website must be live (online or running on a local dev server). We will crawl live HTML, status codes, speed, and metadata.
-            </p>
+            {websiteUrl ? (
+              <div className="flex items-center justify-between text-[11px] px-1">
+                <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-medium">
+                  <Check className="w-3.5 h-3.5 shrink-0" />
+                  <span>
+                    Ready to audit: <strong className="font-mono">{cleanInputUrl(websiteUrl)}</strong>
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const clean = cleanInputUrl(websiteUrl);
+                    if (clean !== websiteUrl) setWebsiteUrl(clean);
+                  }}
+                  className="text-slate-400 hover:text-brand-500 underline"
+                >
+                  Format URL
+                </button>
+              </div>
+            ) : (
+              <p className="text-[11px] text-slate-400 flex items-center gap-1.5">
+                <Zap className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                Paste any live website link (e.g. domain.com, https://..., or local dev server :5173). Formats and prefixes are auto-detected.
+              </p>
+            )}
           </div>
 
           {/* 2. LOCAL PROJECT CODEBASE FOLDER (Optional for Developers) */}
