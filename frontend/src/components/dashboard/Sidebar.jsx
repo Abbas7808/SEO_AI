@@ -23,7 +23,8 @@ import {
   CreditCard,
   Users,
   Target,
-  Wrench
+  Wrench,
+  Activity
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { getUserPlan, getTrialUsage, isProjectOwner } from '../../utils/planLimits';
@@ -41,6 +42,7 @@ export default function Sidebar({ mobileOpen, setMobileOpen }) {
 
   const navItems = [
     { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true },
+    { to: '/dashboard/traffic', label: 'Traffic Analytics', icon: Activity, badge: 'Live' },
     { to: '/dashboard/clients', label: 'Clients & CRM', icon: Users, badge: 'Agency' },
     { to: '/dashboard/keywords', label: 'Keyword Tracker', icon: Target, badge: 'SERP' },
     { to: '/dashboard/proposals', label: 'Proposals & Pitches', icon: Sparkles, badge: 'Win Clients' },

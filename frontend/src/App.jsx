@@ -57,6 +57,7 @@ const KeywordTrackerPage = lazyWithRetry(() => import('./pages/KeywordTrackerPag
 const ProposalsPage = lazyWithRetry(() => import('./pages/ProposalsPage'));
 const InvoicesPage = lazyWithRetry(() => import('./pages/InvoicesPage'));
 const SEOToolboxPage = lazyWithRetry(() => import('./pages/SEOToolboxPage'));
+const TrafficAnalyticsPage = lazyWithRetry(() => import('./pages/TrafficAnalyticsPage'));
 const ClientPortalPage = lazyWithRetry(() => import('./pages/ClientPortalPage'));
 
 export default function App() {
@@ -104,6 +105,7 @@ export default function App() {
             <Route path="proposals" element={<ProposalsPage />} />
             <Route path="invoices" element={<InvoicesPage />} />
             <Route path="toolbox" element={<SEOToolboxPage />} />
+            <Route path="traffic" element={<TrafficAnalyticsPage />} />
             <Route path="new" element={<StartAuditPage />} />
             <Route path="roadmap" element={<RoadmapPage />} />
             <Route path="antigravity" element={<AntigravityFixerPage />} />
