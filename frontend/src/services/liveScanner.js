@@ -137,25 +137,36 @@ export function estimateTrafficLocally(websiteUrl, options = {}) {
   const megaDomains = ['google', 'youtube', 'facebook', 'amazon', 'apple', 'wikipedia', 'github', 'netflix', 'microsoft', 'twitter', 'x.com', 'openai', 'instagram', 'linkedin', 'reddit', 'tiktok'];
   const isMega = megaDomains.some(d => hostname.includes(d));
 
-  const baseMonthlyVisits = isMega
-    ? 48000000 + Math.round(seed * 65000000)
-    : Math.round((Math.pow(overallScore / 50, 1.8) * Math.max(wordCount / 80, 1) * 3200 * (0.8 + seed * 0.4)) + (seed * 3500) + 1400);
+  // Detect newly created / local sites or small stores vs mega authority domains
+  const isLocalOrNew = options.isNewSite || (!isMega && (wordCount < 1200 || overallScore < 60 || hostname.includes('store') || hostname.includes('shop')));
+  
+  let baseMonthlyVisits = 0;
+  if (isMega) {
+    baseMonthlyVisits = 48000000 + Math.round(seed * 65000000);
+  } else if (isLocalOrNew) {
+    // Realistic initial visits for new / emerging websites (under 1-6 months old)
+    baseMonthlyVisits = Math.round(35 + (seed * 85));
+  } else {
+    // Normal medium authority domain calculation
+    baseMonthlyVisits = Math.round((Math.pow(overallScore / 70, 1.6) * Math.max(wordCount / 300, 1) * 450 * (0.6 + seed * 0.4)) + (seed * 300) + 120);
+  }
 
-  const orgShare = Math.min(Math.max(Math.round(50 + (overallScore * 0.2) + (seed * 4)), 42), 76);
-  const dirShare = Math.min(Math.max(Math.round(22 + (seed * 8)), 14), 32);
-  const refShare = Math.min(Math.max(Math.round(8 + (seed * 6)), 5), 15);
-  const socShare = Math.max(100 - (orgShare + dirShare + refShare), 4);
+  const orgShare = isLocalOrNew ? Math.min(Math.max(Math.round(15 + (seed * 15)), 8), 30) : Math.min(Math.max(Math.round(50 + (overallScore * 0.2) + (seed * 4)), 42), 76);
+  const dirShare = isLocalOrNew ? Math.min(Math.max(Math.round(55 + (seed * 20)), 45), 75) : Math.min(Math.max(Math.round(22 + (seed * 8)), 14), 32);
+  const refShare = isLocalOrNew ? Math.min(Math.max(Math.round(5 + (seed * 8)), 2), 12) : Math.min(Math.max(Math.round(8 + (seed * 6)), 5), 15);
+  const socShare = Math.max(100 - (orgShare + dirShare + refShare), 2);
 
-  let trafficTier = 'Emerging Site';
+  let trafficTier = 'New / Emerging Site';
   if (baseMonthlyVisits > 10000000) trafficTier = 'Global Giant';
   else if (baseMonthlyVisits > 5000000) trafficTier = 'Global Enterprise';
   else if (baseMonthlyVisits > 250000) trafficTier = 'High-Traffic Authority';
-  else if (baseMonthlyVisits > 25000) trafficTier = 'Established Traffic';
-  else if (baseMonthlyVisits > 5000) trafficTier = 'Growing Audience';
+  else if (baseMonthlyVisits > 5000) trafficTier = 'Established Traffic';
+  else if (baseMonthlyVisits > 500) trafficTier = 'Growing Audience';
+  else trafficTier = 'New / Early Stage';
 
-  const growthRate = `+${(9.2 + (seed * 9.5)).toFixed(1)}%`;
-  const estimatedCpc = 1.45 + (seed * 1.6);
-  const monthlyTrafficValueUsd = Math.round(baseMonthlyVisits * (orgShare / 100) * 0.35 * estimatedCpc);
+  const growthRate = isLocalOrNew ? `+${(1.5 + (seed * 4)).toFixed(1)}%` : `+${(9.2 + (seed * 9.5)).toFixed(1)}%`;
+  const estimatedCpc = 0.85 + (seed * 0.9);
+  const monthlyTrafficValueUsd = Math.round(baseMonthlyVisits * (orgShare / 100) * 0.25 * estimatedCpc);
 
   // Top Search Keywords Ranking Breakdown
   const topKeywords = [

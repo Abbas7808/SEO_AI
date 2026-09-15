@@ -62,19 +62,24 @@ class TrafficEstimator {
     const isMegaDomain = megaDomains.some(d => hostname.includes(d));
 
     // Base estimated monthly visits calculation
+    const isLocalOrNew = (pageCount <= 2 && totalWords < 1500) || (!isMegaDomain && (hostname.includes('store') || hostname.includes('shop') || totalWords < 1200));
+
     let baseVisits = 0;
     if (isMegaDomain) {
       baseVisits = 45000000 + Math.round(seed * 75000000);
+    } else if (isLocalOrNew) {
+      // Realistic initial visits for new / emerging websites
+      baseVisits = Math.round(35 + (seed * 85));
     } else {
       // Algorithmic calculation:
       // Page Volume x Content Factor x SEO Score Factor x TLD Multiplier x Seed Variance
-      const scoreFactor = Math.pow(overallScore / 50, 1.8);
-      const pageFactor = Math.log10(pageCount + 1) * 2800;
-      const contentFactor = Math.min(Math.max(totalWords / 1200, 1), 6);
-      const linkFactor = Math.min(Math.max(totalInternalLinks / 15, 1), 4);
+      const scoreFactor = Math.pow(overallScore / 70, 1.6);
+      const pageFactor = Math.log10(pageCount + 1) * 800;
+      const contentFactor = Math.min(Math.max(totalWords / 1200, 1), 4);
+      const linkFactor = Math.min(Math.max(totalInternalLinks / 15, 1), 3);
       const variance = 0.75 + (seed * 0.5); // 0.75 to 1.25
 
-      baseVisits = Math.round((pageFactor * contentFactor * scoreFactor * linkFactor * tldMultiplier * variance) + (seed * 4500) + 1200);
+      baseVisits = Math.round((pageFactor * contentFactor * scoreFactor * linkFactor * tldMultiplier * variance) + (seed * 300) + 120);
     }
 
     // Min / Max traffic confidence range
@@ -83,11 +88,10 @@ class TrafficEstimator {
     const medianVisits = baseVisits;
 
     // 3. Traffic Channel Breakdown
-    // Higher SEO scores increase organic search share
-    const organicShare = Math.min(Math.max(Math.round(48 + (overallScore * 0.22) + (seed * 6)), 40), 78);
-    const directShare = Math.min(Math.max(Math.round(20 + (seed * 10)), 12), 35);
-    const referralShare = Math.min(Math.max(Math.round(7 + (seed * 6)), 4), 16);
-    const socialShare = Math.max(100 - (organicShare + directShare + referralShare), 3);
+    const organicShare = isLocalOrNew ? Math.min(Math.max(Math.round(15 + (seed * 15)), 8), 30) : Math.min(Math.max(Math.round(48 + (overallScore * 0.22) + (seed * 6)), 40), 78);
+    const directShare = isLocalOrNew ? Math.min(Math.max(Math.round(55 + (seed * 20)), 45), 75) : Math.min(Math.max(Math.round(20 + (seed * 10)), 12), 35);
+    const referralShare = isLocalOrNew ? Math.min(Math.max(Math.round(5 + (seed * 8)), 2), 12) : Math.min(Math.max(Math.round(7 + (seed * 6)), 4), 16);
+    const socialShare = Math.max(100 - (organicShare + directShare + referralShare), 2);
 
     const channels = {
       organicSearch: {

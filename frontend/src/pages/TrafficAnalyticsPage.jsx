@@ -431,6 +431,27 @@ export default function TrafficAnalyticsPage() {
             </div>
           </div>
 
+          {/* Transparent Notice & Real Analytics Link */}
+          <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <div className="flex items-start sm:items-center gap-2.5 text-amber-800 dark:text-amber-200">
+              <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5 sm:mt-0" />
+              <div>
+                <span className="font-bold">Algorithmic Model Estimate:</span>
+                <span className="ml-1 text-amber-700 dark:text-amber-300">
+                  Public tools cannot access private server logs. For 100% verified real-time visitor counts, connect your Google Search Console or Google Analytics 4.
+                </span>
+              </div>
+            </div>
+            <a
+              href="https://search.google.com/search-console"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl font-bold bg-amber-500 hover:bg-amber-600 text-slate-950 shrink-0 shadow-sm transition-all"
+            >
+              Verify on Google <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          </div>
+
           {/* ── Section Nav (GA-style) ────────────────────────────────────── */}
           <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-2xl w-fit">
             {sections.map(s => (
